@@ -1,0 +1,15 @@
+[Unit]
+Description=Camera Streaming Service
+After=network.target mediamtx.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ad/Desktop/WS/stream_rtsp
+ExecStart=/usr/bin/python3 /home/ad/Desktop/WS/stream_rtsp/main.py
+Restart=on-failure
+RestartSec=5
+User=ad
+Environment="PATH=/usr/bin:/bin"
+
+[Install]
+WantedBy=multi-user.target

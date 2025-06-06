@@ -1,0 +1,16 @@
+[Unit]
+Description=MediaMTX RTSP Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/ad/Desktop/WS/mediamtx
+Restart=on-failure
+User=ad
+WorkingDirectory=/home/ad/Desktop/WS
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=mediamtx
+
+[Install]
+WantedBy=multi-user.target
