@@ -4,7 +4,7 @@ import cv2
 
 process = (
     ffmpeg
-    .input("rtsp://192.168.137.112:8554/ES_MTX", rtsp_transport='udp', flags='low_delay', fflags='nobuffer', probesize='32', analyzeduration='0')
+    .input("rtsp://192.168.137.112:8554/ES_MTX", rtsp_transport='udp', flags='low_delay', fflags='nobuffer', probesize='32', analyzeduration='0', r='24')
     .output('pipe:', format='rawvideo', pix_fmt='bgr24')
     .run_async(pipe_stdout=True)
 )

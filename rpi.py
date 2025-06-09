@@ -6,8 +6,8 @@ libcamera_cmd = [
     "-t", "0",
     "--width", "640",
     "--height", "480",
-    "--framerate", "30",
-    "--bitrate", "2000000",
+    "--framerate", "24",
+    "--bitrate", "1500000",
     "--codec", "h264",
     "--inline",
     "--profile", "baseline",
@@ -23,6 +23,7 @@ ffmpeg_cmd = [
     "-flags", "low_delay",
     "-probesize", "32",
     "-analyzeduration", "0",
+    "-r", "24",
     "-f", "h264",
     "-i", "-",
     "-c:v", "copy",          # Không encode lại, giữ nguyên stream H.264 từ GPU
