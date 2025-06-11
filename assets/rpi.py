@@ -3,6 +3,7 @@ import socket
 import threading
 import time
 import random
+import struct
 
 libcamera_cmd = [
     "libcamera-vid",
@@ -36,10 +37,10 @@ ffmpeg_cmd = [
 
 class TCPServer:
     def __init__(self, host='0.0.0.0', port=5000):
-        # Khởi động RTSP
+        # Start RTSP
         self.libcamera_proc = subprocess.Popen(libcamera_cmd, stdout=subprocess.PIPE)
         self.ffmpeg_proc = subprocess.Popen(ffmpeg_cmd, stdin=self.libcamera_proc.stdout)
-        print("Streaming tới rtsp://<IP_RPI>:8554/ES_MTX")
+        print("Streaming to rtsp://<IP_RPI>:8554/ES_MTX")
 
         # TCP server
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -49,18 +50,33 @@ class TCPServer:
         print(f"TCP Server listening on {host}:{port}")
 
     def calculate_checksum(self, data):
-        return data[0] ^ data[1] ^ data[2]
+        # Calculate checksum from all bytes except the last one (checksum byte)
+        result = 0
+        for b in data[:-1]:
+            result ^= b
+        return result
 
     def handle_client(self, client_socket):
         try:
             while self.running:
                 random_value = random.randint(0, 10)
-                response = bytes([1, 0x02, random_value, 0])
-                response = response[:-1] + bytes([self.calculate_checksum(response)])
                 
-                client_socket.send(response)
+                # Get current timestamp in milliseconds
+                timestamp_ms = int(time.time() * 1000)
                 
-                time.sleep(1 / 24)  # Gửi đúng 24 gói/s
+                # Create packet: [type(1)][id(1)][value(1)][timestamp(8)][checksum(1)]
+                # Convert timestamp to 8 bytes using struct.pack
+                timestamp_bytes = struct.pack('>Q', timestamp_ms)  # big-endian 8-byte unsigned long long
+                
+                # Combine all bytes except checksum
+                packet = bytes([1, 0x02, random_value]) + timestamp_bytes + bytes([0])
+                
+                # Calculate and set checksum
+                packet = packet[:-1] + bytes([self.calculate_checksum(packet)])
+                
+                client_socket.send(packet)
+                
+                time.sleep(1 / 24)  # Send 24 packets/s
         except (socket.error, ConnectionResetError):
             print("Client disconnected.")
         finally:
