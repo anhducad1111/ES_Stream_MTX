@@ -37,7 +37,7 @@ class GraphView:
         # Print debug info every second
         current_time = time.time()
         if current_time - self.last_print >= 1.0:
-            print(f"Graph Update - Value: {value}, Points: {len(self.values)}")
+            # print(f"Graph Update - Value: {value}, Points: {len(self.values)}")
             self.last_print = current_time
 
         # Store data at full rate
