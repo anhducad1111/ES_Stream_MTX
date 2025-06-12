@@ -57,24 +57,45 @@ class TCPReceiver:
                 # Read data
                 while self.run and self.connected:
                     try:
-                        data = client.recv(12)
+                        # Read full packet (16 bytes)
+                        data = client.recv(16)
                         if not data:  # Connection closed by server
                             print("TCP connection lost - no data")
                             self.connected = False
                             break
                             
-                        if len(data) != 12:
+                        if len(data) != 16:
                             continue
 
-                        # Extract data from packet
-                        typ, id_, value = data[0:3]
-                        timestamp_bytes = data[3:11]
+                        # Validate packet header
+                        if data[0] != 0x00 or data[1] != 0xFF:  # Check P and N
+                            print("Invalid packet header")
+                            continue
 
-                        # Extract timestamp
+                        # Extract fields
+                        id_ = data[2]
+                        typ = data[3]
+                        payload_len = (data[4] << 8) | data[5]  # Convert 2 bytes to length
+                        
+                        if payload_len != 9:
+                            print("Invalid payload length")
+                            continue
+
+                        # Extract payload (1B value + 8B timestamp)
+                        value = data[6]
+                        timestamp_bytes = data[7:15]
                         timestamp = struct.unpack('>Q', timestamp_bytes)[0]
+
+                        # Verify checksum
+                        calc_checksum = 0
+                        for b in data[:-1]:
+                            calc_checksum ^= b
+                        if calc_checksum != data[15]:
+                            print("Checksum mismatch")
+                            continue
                         
                         # Update values and last data time
-                        if typ == 1 and id_ == 0x02:
+                        if id_ == 0x01 and typ == 0x00:  # Data Response packet
                             self.finger_count = value
                             self.timestamp_ms = timestamp
                             self.last_data_time = time.time()

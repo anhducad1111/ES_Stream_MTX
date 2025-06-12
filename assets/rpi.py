@@ -64,12 +64,23 @@ class TCPServer:
                 # Get current timestamp in milliseconds
                 timestamp_ms = int(time.time() * 1000)
                 
-                # Create packet: [type(1)][id(1)][value(1)][timestamp(8)][checksum(1)]
-                # Convert timestamp to 8 bytes using struct.pack
+                # Create packet format:
+                # [P(1)][N(1)][id(1)][type(1)][payload_len(2)][payload(9)][checksum(1)]
+                
+                # Convert timestamp to 8 bytes
                 timestamp_bytes = struct.pack('>Q', timestamp_ms)  # big-endian 8-byte unsigned long long
                 
-                # Combine all bytes except checksum
-                packet = bytes([1, 0x02, random_value]) + timestamp_bytes + bytes([0])
+                # Create payload (1B value + 8B timestamp)
+                payload = bytes([random_value]) + timestamp_bytes
+                
+                # Create packet with fixed P=0x00, N=0xFF
+                packet = bytes([
+                    0x00,           # P (fixed value)
+                    0xFF,           # N (fixed value)
+                    0x01,           # ID (Data)
+                    0x00,           # Type (Response)
+                    0x00, 0x09      # Payload Length (2 bytes = 9)
+                ]) + payload + bytes([0])
                 
                 # Calculate and set checksum
                 packet = packet[:-1] + bytes([self.calculate_checksum(packet)])

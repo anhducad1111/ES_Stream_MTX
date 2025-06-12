@@ -8,6 +8,8 @@ class GraphView:
     def __init__(self, master):
         self.times = deque(maxlen=100)
         self.values = deque(maxlen=100)
+        self.smoothed_values = deque(maxlen=100)  # For storing smoothed values
+        self.window_size = 5  # Smoothing window size
         self.last_update = 0
         self.last_print = 0
         self.last_value = None
@@ -46,13 +48,26 @@ class GraphView:
             self.times.append(dt)
             self.values.append(value)
             
-            # Only redraw every 200ms
-            if current_time - self.last_update >= 0.2:
+            # Calculate smoothed value using moving average
+            values_list = list(self.values)
+            if len(values_list) >= self.window_size:
+                # Calculate moving average for the latest window
+                window = values_list[-self.window_size:]
+                smoothed = sum(window) / self.window_size
+            else:
+                # Use actual value if not enough data points
+                smoothed = value
+            self.smoothed_values.append(smoothed)
+
+            # Only redraw every 100ms
+            if current_time - self.last_update >= 0.1:
                 # Plot all collected data
                 self.ax.clear()
                 if len(self.times) > 0:  # Only plot if we have data
                     dates = plt.matplotlib.dates.date2num(list(self.times))
-                    self.ax.plot(dates, list(self.values), color='#00ff00')
+                    # Plot both raw and smoothed data
+                    self.ax.plot(dates, list(self.values), color="#00C900", alpha=0.3, linewidth=1.5)  # Raw data
+                    self.ax.plot(dates, list(self.smoothed_values), color='#00ff00', linewidth=2)  # Smoothed data
                     
                     # Format x-axis
                     self.ax.grid(True, alpha=0.3)
