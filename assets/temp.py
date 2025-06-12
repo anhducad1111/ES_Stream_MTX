@@ -11,6 +11,7 @@ process = (
 
 width, height = 640, 480
 
+
 while True:
     in_bytes = process.stdout.read(width * height * 3)
     if not in_bytes:

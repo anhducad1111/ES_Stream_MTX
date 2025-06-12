@@ -15,7 +15,7 @@ class GraphView:
         
         # Setup chart
         plt.style.use('dark_background')
-        self.fig, self.ax = plt.subplots(figsize=(15, 4))
+        self.fig, self.ax = plt.subplots(figsize=(14, 4))
         self.canvas = FigureCanvasTkAgg(self.fig, master=master)
         self.canvas.draw()
 
