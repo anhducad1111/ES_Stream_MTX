@@ -72,7 +72,7 @@ class GraphView:
                     # Format x-axis
                     self.ax.grid(True, alpha=0.3)
                     plt.setp(self.ax.get_xticklabels(), rotation=45)
-                    self.ax.xaxis.set_major_formatter(plt.matplotlib.dates.DateFormatter('%H:%M:%S.%f'))
+                    self.ax.xaxis.set_major_formatter(plt.matplotlib.dates.DateFormatter('%H:%M:%S'))
                     
                     self.fig.tight_layout()
                     self.canvas.draw()

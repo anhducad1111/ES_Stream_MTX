@@ -140,6 +140,41 @@ class SettingsReceiver(TCPBase):
         super().__init__(server_ip, port)
         self.settings = None  # Will be populated when settings are received
         self.settings_received = False  # Flag to track successful receipt
+        self.client = None
+
+    def send_command(self, settings):
+        """Send settings update command"""
+        if not self.connected or not self.client:
+            print("Not connected - cannot send settings")
+            return False
+
+        try:
+            # Pack settings into 5-byte payload
+            payload = bytes([
+                int(settings['gain']),                # Direct value
+                int(float(settings['exposure']) * 10),  # *10 for decimal
+                int(float(settings['awb_red']) * 10),
+                int(float(settings['awb_green']) * 10),
+                int(float(settings['awb_blue']) * 10)
+            ])
+
+            # Create command packet
+            packet = bytes([
+                0x00, 0xFF,  # P, N
+                0x02,        # ID (Settings)
+                0x01,        # Type (Command)
+                0x00, 0x05   # Payload Length (5 bytes)
+            ]) + payload + bytes([0])
+
+            # Add checksum
+            packet = packet[:-1] + bytes([self._calculate_checksum(packet[:-1])])
+            self.client.send(packet)
+            print("Sent settings command:", settings)
+            return True
+
+        except Exception as e:
+            print(f"Error sending settings command: {e}")
+            return False
 
     def _tcp_receiver(self):
         while self.run:
@@ -159,23 +194,25 @@ class SettingsReceiver(TCPBase):
                             time.sleep(self.reconnect_delay)
                             continue
                         self.connected = True
+                        self.client = client  # Store client socket
                         self.next_request_time = current_time
 
-                while self.run and self.connected and not self.settings_received:
+                while self.run and self.connected:
                     try:
-                        # Send settings request
-                        request = bytes([
-                            0x00, 0xFF,  # P, N
-                            0x02,        # ID (Settings)
-                            0x01,        # Type (Request)
-                            0x00, 0x00   # Payload Length
-                        ]) + bytes([0])  # Checksum placeholder
-                        request = request[:-1] + bytes([self._calculate_checksum(request[:-1])])
-                        client.send(request)
-                        print("Requesting settings...")
+                        # Send request if we haven't received settings yet
+                        if not self.settings_received:
+                            request = bytes([
+                                0x00, 0xFF,  # P, N
+                                0x02,        # ID (Settings)
+                                0x01,        # Type (Request)
+                                0x00, 0x00   # Payload Length
+                            ]) + bytes([0])  # Checksum placeholder
+                            request = request[:-1] + bytes([self._calculate_checksum(request[:-1])])
+                            self.client.send(request)
+                            print("Requesting settings...")
 
-                        # Wait for response
-                        header = client.recv(6)
+                        # Handle incoming packets
+                        header = self.client.recv(6)
                         if not header or len(header) != 6:
                             raise ConnectionError("Invalid header")
 
@@ -186,7 +223,7 @@ class SettingsReceiver(TCPBase):
                         typ = header[3]
                         payload_len = (header[4] << 8) | header[5]
 
-                        data = client.recv(payload_len + 1)
+                        data = self.client.recv(payload_len + 1)
                         if len(data) != payload_len + 1:
                             raise ConnectionError("Invalid payload")
 
@@ -194,40 +231,42 @@ class SettingsReceiver(TCPBase):
                         if self._calculate_checksum(packet) != data[-1]:
                             continue
 
-                        # Handle settings response
+                        # Process the packet
                         self._handle_packet(id_, typ, data[:-1])
-                        if self.settings is not None:
-                            self.settings_received = True
-                            print("Settings received successfully")
-                            break  # Exit loop after successful receipt
+                        self.last_data_time = time.time()
 
                     except socket.timeout:
+                        # Just continue on timeout
                         continue
                     except Exception as e:
                         print(f"Settings read error: {e}")
                         self.connected = False
+                        self.client = None
                         break
 
-                # Break main loop if settings received
-                if self.settings_received:
-                    break
+                # Keep connection alive even after settings received
+                # so we can send commands
 
             except Exception as e:
                 print(f"Settings connection error: {e}")
                 self.connected = False
             finally:
-                if 'client' in locals():
-                    client.close()
+                if self.client:
+                    self.client.close()
+                    self.client = None
                 time.sleep(self.reconnect_delay)
 
     def _handle_packet(self, id_, typ, payload):
-        """Handle settings response packet"""
-        if id_ == 0x02 and typ == 0x00 and len(payload) == 9:
+        """Handle settings packets"""
+        if id_ != 0x02:  # Not a settings packet
+            return
+
+        if typ == 0x00 and len(payload) == 9:  # Settings response
             try:
                 # Get raw values from payload
                 gain = payload[0]  # Direct value
                 exposure = float(payload[1]) / 10.0  # Multiply by 10 on server
-                awb_red = float(payload[2]) / 10.0   # Multiply by 10 on server
+                awb_red = float(payload[2]) / 10.0
                 awb_green = float(payload[3]) / 10.0
                 awb_blue = float(payload[4]) / 10.0
                 
@@ -239,10 +278,10 @@ class SettingsReceiver(TCPBase):
                     'awb_blue': awb_blue
                 }
                 print("Settings received:", self.settings)
-                self.settings_received = True  # Mark successful receipt
+                self.settings_received = True
             except Exception as e:
                 print(f"Error unpacking settings: {e}")
-                self.settings_received = False  # Keep trying on error
+                self.settings_received = False
 
     def get_settings(self):
         return self.settings

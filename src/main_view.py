@@ -46,6 +46,9 @@ class App(ctk.CTk):
         # Settings setup
         self.settings_view = SettingView(self)
         self.settings_view.get_frame().grid(row=0, column=1, padx=20, pady=20, sticky="ew")
+        
+        # Set ourselves as parent for settings callbacks
+        self.settings_view.set_parent(self)
 
         # Status bar setup
         self.status_frame = ctk.CTkFrame(self)
@@ -149,6 +152,13 @@ class App(ctk.CTk):
             self.video_label.configure(image=ctk_image)
         
         self.after(1, self.update_video)
+
+    def send_settings(self, settings):
+        """Called by SettingView when Apply is clicked"""
+        if self.settings_receiver.send_command(settings):
+            print("Settings command sent successfully")
+        else:
+            print("Failed to send settings command")
         
     def update_graph(self):
         if not self.data_receiver.run:

@@ -6,56 +6,90 @@ import random
 import struct
 import json
 
-# Load camera settings first
-try:
-    with open('config/camera_settings.json', 'r') as f:
-        settings = json.load(f)
-        print("Loaded camera settings:", settings)
-except Exception as e:
-    print(f"Error loading settings: {e}, using defaults")
-    settings = {
-        'exposure': 1.0,
-        'gain': 1,
-        'awb_red': 1.0,
-        'awb_green': 1.0,
-        'awb_blue': 1.0
-    }
+class CameraManager:
+    _instance = None
+    _initialized = False
 
-# Create camera command with settings
-libcamera_cmd = [
-    "libcamera-vid",
-    "-t", "0",
-    "--width", "640",
-    "--height", "480",
-    "--framerate", "24",
-    "--bitrate", "1500000",
-    "--codec", "h264",
-    "--inline",
-    "--profile", "baseline",
-    "--level", "4.2",
-    "--intra", "15",
-    "--vflip",
-    "--nopreview",
-    "--exposure", "normal",
-    "--ev", str(settings['exposure']),
-    "--gain", str(settings['gain']),
-    "--awbgains", f"{settings['awb_red']},{settings['awb_green']},{settings['awb_blue']}",
-    "-o", "-"
-]
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
-ffmpeg_cmd = [
-    "ffmpeg",
-    "-fflags", "nobuffer",
-    "-flags", "low_delay",
-    "-probesize", "32",
-    "-analyzeduration", "0",
-    "-r", "24",
-    "-f", "h264",
-    "-i", "-",
-    "-c:v", "copy",
-    "-f", "rtsp",
-    "rtsp://localhost:8554/ES_MTX"
-]
+    def __init__(self):
+        if not CameraManager._initialized:
+            # Load settings
+            try:
+                with open('config/camera_settings.json', 'r') as f:
+                    self.settings = json.load(f)
+                    print("Loaded camera settings:", self.settings)
+            except Exception as e:
+                print(f"Error loading settings: {e}, using defaults")
+                self.settings = {
+                    'exposure': 1.0,
+                    'gain': 1,
+                    'awb_red': 1.0,
+                    'awb_green': 1.0,
+                    'awb_blue': 1.0
+                }
+            
+            self.libcamera_proc = None
+            self.ffmpeg_proc = None
+            CameraManager._initialized = True
+
+    def get_camera_cmd(self):
+        return [
+            "libcamera-vid",
+            "-t", "0",
+            "--width", "640",
+            "--height", "480",
+            "--framerate", "24",
+            "--codec", "h264",
+            "--inline",
+            "--profile", "baseline",
+            "--level", "4.2",
+            "--vflip",
+            "--nopreview",
+            "--exposure", "normal",
+            "--ev", str(self.settings['exposure']),
+            "--gain", str(self.settings['gain']),
+            "--awbgains", f"{self.settings['awb_red']},{self.settings['awb_green']},{self.settings['awb_blue']}",
+            "-o", "-"
+        ]
+
+    def get_ffmpeg_cmd(self):
+        return [
+            "ffmpeg",
+            "-fflags", "nobuffer",
+            "-flags", "low_delay",
+            "-probesize", "32",
+            "-analyzeduration", "0",
+            "-r", "24",
+            "-f", "h264",
+            "-i", "-",
+            "-c:v", "copy",
+            "-f", "rtsp",
+            "rtsp://localhost:8554/ES_MTX"
+        ]
+
+    def start_camera(self):
+        print("Starting camera...")
+        self.libcamera_proc = subprocess.Popen(self.get_camera_cmd(), stdout=subprocess.PIPE)
+        self.ffmpeg_proc = subprocess.Popen(self.get_ffmpeg_cmd(), stdin=self.libcamera_proc.stdout)
+
+    def stop_camera(self):
+        if self.libcamera_proc:
+            self.libcamera_proc.terminate()
+        if self.ffmpeg_proc:
+            self.ffmpeg_proc.terminate()
+
+    def update_settings(self, new_settings):
+        print("Updating camera settings:", new_settings)
+        self.settings.update(new_settings)
+        with open('config/camera_settings.json', 'w') as f:
+            json.dump(self.settings, f)
+        self.stop_camera()
+        time.sleep(0.5)  # Wait for processes to close
+        self.start_camera()
 
 class TCPServerBase:
     """Base class for TCP servers"""
@@ -90,9 +124,8 @@ class DataServer(TCPServerBase):
     """Handles numeric data streaming"""
     def __init__(self, host='0.0.0.0', port=5000):
         super().__init__(host, port)
-        # Start RTSP
-        self.libcamera_proc = subprocess.Popen(libcamera_cmd, stdout=subprocess.PIPE)
-        self.ffmpeg_proc = subprocess.Popen(ffmpeg_cmd, stdin=self.libcamera_proc.stdout)
+        self.camera_mgr = CameraManager()
+        self.camera_mgr.start_camera()
         print("Streaming to rtsp://<IP_RPI>:8554/ES_MTX")
 
     def handle_client(self, client_socket):
@@ -126,14 +159,13 @@ class DataServer(TCPServerBase):
 
     def cleanup(self):
         super().cleanup()
-        self.libcamera_proc.terminate()
-        self.ffmpeg_proc.terminate()
+        self.camera_mgr.stop_camera()
 
 class SettingsServer(TCPServerBase):
     """Handles settings requests"""
     def __init__(self, host='0.0.0.0', port=5001):
         super().__init__(host, port)
-        self.settings_file = 'config/camera_settings.json'
+        self.camera_mgr = CameraManager()
 
     def handle_client(self, client_socket):
         client_socket.settimeout(1.0)
@@ -152,35 +184,56 @@ class SettingsServer(TCPServerBase):
 
                     id_ = header[2]
                     typ = header[3]
+                    payload_len = (header[4] << 8) | header[5]
 
-                    # Handle settings request
+                    # Get payload if present
+                    payload = None
+                    if payload_len > 0:
+                        payload = client_socket.recv(payload_len)
+                        if len(payload) != payload_len:
+                            continue
+
+                    # Handle settings requests and commands
                     if id_ == 0x02 and typ == 0x01:
                         try:
-                            # Use the global settings loaded at startup
-                            settings_data = bytes([
-                                int(settings['gain']),  # gain as-is
-                                int(settings['exposure'] * 10),  # exposure * 10 to preserve 1 decimal
-                                int(settings['awb_red'] * 10),  # awb * 10 to preserve 1 decimal
-                                int(settings['awb_green'] * 10),
-                                int(settings['awb_blue'] * 10),
-                                0, 0, 0, 0  # padding
-                            ])
+                            print(f"Got settings packet: len={payload_len}")
+                            if payload_len == 0:  # Request current settings
+                                # Send current settings
+                                settings_data = bytes([
+                                    int(self.camera_mgr.settings['gain']),
+                                    int(self.camera_mgr.settings['exposure'] * 10),
+                                    int(self.camera_mgr.settings['awb_red'] * 10),
+                                    int(self.camera_mgr.settings['awb_green'] * 10),
+                                    int(self.camera_mgr.settings['awb_blue'] * 10),
+                                    0, 0, 0, 0  # padding
+                                ])
 
-                            # Create response packet
-                            packet = bytes([
-                                0x00,           # P
-                                0xFF,           # N
-                                0x02,           # ID (Settings)
-                                0x00,           # Type (Response)
-                                0x00, 0x09      # Payload Length
-                            ]) + settings_data + bytes([0])
+                                packet = bytes([
+                                    0x00,           # P
+                                    0xFF,           # N
+                                    0x02,           # ID (Settings)
+                                    0x00,           # Type (Response)
+                                    0x00, 0x09      # Payload Length
+                                ]) + settings_data + bytes([0])
 
-                            packet = packet[:-1] + bytes([self.calculate_checksum(packet[:-1])])
-                            client_socket.send(packet)
-                            print("Sent settings")
+                                packet = packet[:-1] + bytes([self.calculate_checksum(packet[:-1])])
+                                client_socket.send(packet)
+                                print("Sent current settings")
+
+                            elif payload_len == 5:  # Update settings command
+                                print("Processing settings update command")
+                                # Update settings
+                                new_settings = {
+                                    'gain': payload[0],
+                                    'exposure': payload[1] / 10.0,
+                                    'awb_red': payload[2] / 10.0,
+                                    'awb_green': payload[3] / 10.0,
+                                    'awb_blue': payload[4] / 10.0
+                                }
+                                self.camera_mgr.update_settings(new_settings)
 
                         except Exception as e:
-                            print(f"Error reading settings: {e}")
+                            print(f"Error handling settings: {e}")
 
                 except socket.timeout:
                     pass  # Normal timeout

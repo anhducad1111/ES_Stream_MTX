@@ -5,6 +5,7 @@ class SettingView:
         self.frame = ctk.CTkFrame(master)
         self.sliders = {}
         self.entries = {}
+        self.parent = None
         
         # Camera control sliders configuration
         self.slider_configs = {
@@ -86,10 +87,22 @@ class SettingView:
             entry.delete(0, 'end')
             entry.insert(0, str(value))
     
+    def set_parent(self, parent):
+        """Set parent for callbacks"""
+        self.parent = parent
+
     def _on_apply(self):
-        # Validate all entries before applying
-        for name in self.slider_configs.keys():
-            self._validate_entry(name)
+        if self.parent:
+            settings = {
+                'gain': int(self.sliders['Gain'].get()),
+                'exposure': float(self.sliders['Exposure'].get()),
+                'awb_red': float(self.sliders['AWB Red'].get()),
+                'awb_green': float(self.sliders['AWB Green'].get()),
+                'awb_blue': float(self.sliders['AWB Blue'].get())
+            }
+            
+            # Send settings to parent
+            self.parent.send_settings(settings)
     
     def get_frame(self):
         return self.frame
