@@ -29,7 +29,7 @@ class CameraControl:
     
     def load_settings(self):
         try:
-            with open('camera_settings.json', 'r') as f:
+            with open('config/camera_settings.json', 'r') as f:
                 return json.load(f)
         except:
             return {
@@ -48,7 +48,7 @@ class CameraControl:
             'awb_green': float(self.awb_g_slider.get()),
             'awb_blue': float(self.awb_b_slider.get())
         }
-        with open('camera_settings.json', 'w') as f:
+        with open('config/camera_settings.json', 'w') as f:
             json.dump(settings, f)
 
     def update_exposure_label(self, value):

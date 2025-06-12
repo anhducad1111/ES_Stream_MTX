@@ -6,6 +6,22 @@ import random
 import struct
 import json
 
+# Load camera settings first
+try:
+    with open('config/camera_settings.json', 'r') as f:
+        settings = json.load(f)
+        print("Loaded camera settings:", settings)
+except Exception as e:
+    print(f"Error loading settings: {e}, using defaults")
+    settings = {
+        'exposure': 1.0,
+        'gain': 1,
+        'awb_red': 1.0,
+        'awb_green': 1.0,
+        'awb_blue': 1.0
+    }
+
+# Create camera command with settings
 libcamera_cmd = [
     "libcamera-vid",
     "-t", "0",
@@ -19,6 +35,11 @@ libcamera_cmd = [
     "--level", "4.2",
     "--intra", "15",
     "--vflip",
+    "--nopreview",
+    "--exposure", "normal",
+    "--ev", str(settings['exposure']),
+    "--gain", str(settings['gain']),
+    "--awbgains", f"{settings['awb_red']},{settings['awb_green']},{settings['awb_blue']}",
     "-o", "-"
 ]
 
@@ -135,18 +156,13 @@ class SettingsServer(TCPServerBase):
                     # Handle settings request
                     if id_ == 0x02 and typ == 0x01:
                         try:
-                            # Read settings directly from json
-                            with open(self.settings_file, 'r') as f:
-                                settings = json.load(f)
-                            print("Loaded settings:", settings)
-
-                            # Pack settings as-is into payload
+                            # Use the global settings loaded at startup
                             settings_data = bytes([
-                                int(settings.get('gain', 1)),  # gain as-is
-                                int(settings.get('exposure', 1) * 10),  # exposure * 10 to preserve 1 decimal
-                                int(settings.get('awb_red', 1) * 10),  # awb * 10 to preserve 1 decimal
-                                int(settings.get('awb_green', 1) * 10),
-                                int(settings.get('awb_blue', 1) * 10),
+                                int(settings['gain']),  # gain as-is
+                                int(settings['exposure'] * 10),  # exposure * 10 to preserve 1 decimal
+                                int(settings['awb_red'] * 10),  # awb * 10 to preserve 1 decimal
+                                int(settings['awb_green'] * 10),
+                                int(settings['awb_blue'] * 10),
                                 0, 0, 0, 0  # padding
                             ])
 
