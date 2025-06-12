@@ -3,7 +3,7 @@ from PIL import Image
 from .video_view import VideoThread
 from .graph_view import GraphView
 from .setting_view import SettingView
-from .tcp_server import TCPReceiver
+from .tcp_server import NumberDataReceiver, SettingsReceiver
 import time
 
 # Constants
@@ -52,17 +52,25 @@ class App(ctk.CTk):
         self.status_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
         self.status_frame.grid_columnconfigure(0, weight=1)
         self.status_frame.grid_columnconfigure(1, weight=1)
+        self.status_frame.grid_columnconfigure(2, weight=1)
         
-        self.tcp_status = ctk.CTkLabel(self.status_frame, text="TCP: Initializing...", fg_color="yellow")
+        self.tcp_status = ctk.CTkLabel(self.status_frame, text="Data: Initializing...", fg_color="yellow")
         self.tcp_status.grid(row=0, column=0, padx=5, pady=2, sticky="w")
         
-        self.rtsp_status = ctk.CTkLabel(self.status_frame, text="RTSP: Initializing...", fg_color="yellow")
-        self.rtsp_status.grid(row=0, column=1, padx=5, pady=2, sticky="w")
+        self.settings_status = ctk.CTkLabel(self.status_frame, text="Settings: Initializing...", fg_color="yellow")
+        self.settings_status.grid(row=0, column=1, padx=5, pady=2, sticky="w")
+        
+        self.video_status = ctk.CTkLabel(self.status_frame, text="Video: Initializing...", fg_color="yellow")
+        self.video_status.grid(row=0, column=2, padx=5, pady=2, sticky="w")
         
         # Start components
-        self.tcp_receiver = TCPReceiver(SERVER_IP, TCP_PORT)
-        self.tcp_receiver.start()
+        # Start TCP connections
+        self.data_receiver = NumberDataReceiver(SERVER_IP, TCP_PORT)
+        self.settings_receiver = SettingsReceiver(SERVER_IP, TCP_PORT + 1)
+        self.data_receiver.start()
+        self.settings_receiver.start()
         
+        # Start video stream
         self.video_thread = VideoThread(RTSP_URL)
         self.video_thread.start()
         
@@ -75,22 +83,60 @@ class App(ctk.CTk):
         self.update_graph()
 
     def update_status(self):
-        # Update TCP status
-        if self.tcp_receiver.is_connected():
-            self.tcp_status.configure(text="TCP: Connected", fg_color="green")
+        # Update TCP Data status
+        if self.data_receiver.is_connected():
+            self.tcp_status.configure(text="Data: Connected", fg_color="green")
         else:
-            self.tcp_status.configure(text="TCP: Connecting...", fg_color="yellow")
+            self.tcp_status.configure(text="Data: Connecting...", fg_color="yellow")
 
-        # Update RTSP status
-        if self.video_thread.is_connected():
-            self.rtsp_status.configure(text="RTSP: Streaming", fg_color="green")
+        # Update Settings status
+        # Update status indicators
+        if self.settings_receiver.is_connected():
+            self.settings_status.configure(text="Settings: Connected", fg_color="green")
+            # Update settings UI if new data available
+            settings = self.settings_receiver.get_settings()
+            if settings:
+                try:
+                    sliders = self.settings_view.sliders
+                    entries = self.settings_view.entries
+                    
+                    # Update sliders and entries
+                    for name, value in settings.items():
+                        slider_name = {
+                            'exposure': 'Exposure',
+                            'gain': 'Gain',
+                            'awb_red': 'AWB Red',
+                            'awb_green': 'AWB Green',
+                            'awb_blue': 'AWB Blue'
+                        }.get(name)
+                        
+                        if slider_name and slider_name in sliders:
+                            sliders[slider_name].set(value)
+                            entries[slider_name].delete(0, 'end')
+                            if slider_name == 'Gain':
+                                entries[slider_name].insert(0, str(int(value)))
+                            else:
+                                entries[slider_name].insert(0, f"{float(value):.1f}")
+                except Exception as e:
+                    print(f"Error updating settings UI: {e}")
         else:
-            self.rtsp_status.configure(text="RTSP: Connecting...", fg_color="yellow")
+            self.settings_status.configure(text="Settings: Connecting...", fg_color="yellow")
+
+        if self.video_thread.is_connected():
+            self.video_status.configure(text="Video: Streaming", fg_color="green")
+        else:
+            self.video_status.configure(text="Video: Connecting...", fg_color="yellow")
+
+        # Update data connection status
+        if self.data_receiver.is_connected():
+            self.tcp_status.configure(text="Data: Connected", fg_color="green")
+        else:
+            self.tcp_status.configure(text="Data: Connecting...", fg_color="yellow")
 
         self.after(500, self.update_status)
         
     def update_video(self):
-        if not self.tcp_receiver.run:
+        if not self.data_receiver.run:
             self.on_closing()
             return
             
@@ -105,17 +151,18 @@ class App(ctk.CTk):
         self.after(1, self.update_video)
         
     def update_graph(self):
-        if not self.tcp_receiver.run:
+        if not self.data_receiver.run:
             return
             
-        count = self.tcp_receiver.get_finger_count()
-        timestamp = self.tcp_receiver.get_timestamp_ms()
+        count = self.data_receiver.get_finger_count()
+        timestamp = self.data_receiver.get_timestamp_ms()
         self.graph_view.update(count, timestamp)
         
         self.after(1, self.update_graph)
     
     def on_closing(self):
-        self.tcp_receiver.stop()
+        self.data_receiver.stop()
+        self.settings_receiver.stop()
         if hasattr(self, 'video_thread'):
             self.video_thread.stop()
         self.graph_view.cleanup()

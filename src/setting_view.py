@@ -8,11 +8,11 @@ class SettingView:
         
         # Camera control sliders configuration
         self.slider_configs = {
-            "Exposure": {"range": (0, 100), "default": 50},
-            "Gain": {"range": (0, 100), "default": 50},
-            "AWB Red": {"range": (0, 255), "default": 128},
-            "AWB Green": {"range": (0, 255), "default": 128},
-            "AWB Blue": {"range": (0, 255), "default": 128}
+            "Exposure": {"range": (0.1, 1.0), "steps": 99, "default": 1.0},
+            "Gain": {"range": (1, 10), "steps": 20, "default": 1},
+            "AWB Red": {"range": (0.0, 5.0), "steps": 50, "default": 1.0},
+            "AWB Green": {"range": (0.0, 5.0), "steps": 50, "default": 1.0},
+            "AWB Blue": {"range": (0.0, 5.0), "steps": 50, "default": 1.0}
         }
         
         self._create_sliders()
@@ -32,6 +32,7 @@ class SettingView:
             slider = ctk.CTkSlider(self.frame,
                                 from_=config["range"][0],
                                 to=config["range"][1],
+                                number_of_steps=config["steps"],
                                 command=lambda v, e=entry: self._on_slider_change(v, e))
             slider.grid(row=i*2+1, column=0, columnspan=2, padx=20, pady=(0,20), sticky="ew")
             slider.set(config["default"])
@@ -50,7 +51,12 @@ class SettingView:
 
     def _on_slider_change(self, value, entry):
         entry.delete(0, 'end')
-        entry.insert(0, str(int(value)))
+        if "Exposure" in self.sliders and entry == self.entries["Exposure"]:
+            entry.insert(0, f"{float(value):.1f}")
+        elif "Gain" in self.sliders and entry == self.entries["Gain"]:
+            entry.insert(0, str(int(float(value))))
+        else:
+            entry.insert(0, f"{float(value):.1f}")
     
     def _validate_entry(self, name):
         entry = self.entries[name]
@@ -58,7 +64,7 @@ class SettingView:
         config = self.slider_configs[name]
         
         try:
-            value = int(entry.get())
+            value = float(entry.get())
             min_val = config["range"][0]
             max_val = config["range"][1]
             
@@ -68,7 +74,10 @@ class SettingView:
                 value = max_val
                 
             entry.delete(0, 'end')
-            entry.insert(0, str(value))
+            if name == "Gain":
+                entry.insert(0, str(int(value)))
+            else:
+                entry.insert(0, f"{value:.1f}")
             slider.set(value)
             
         except ValueError:

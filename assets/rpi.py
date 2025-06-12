@@ -4,6 +4,7 @@ import threading
 import time
 import random
 import struct
+import json
 
 libcamera_cmd = [
     "libcamera-vid",
@@ -35,14 +36,9 @@ ffmpeg_cmd = [
     "rtsp://localhost:8554/ES_MTX"
 ]
 
-class TCPServer:
+class TCPServerBase:
+    """Base class for TCP servers"""
     def __init__(self, host='0.0.0.0', port=5000):
-        # Start RTSP
-        self.libcamera_proc = subprocess.Popen(libcamera_cmd, stdout=subprocess.PIPE)
-        self.ffmpeg_proc = subprocess.Popen(ffmpeg_cmd, stdin=self.libcamera_proc.stdout)
-        print("Streaming to rtsp://<IP_RPI>:8554/ES_MTX")
-
-        # TCP server
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((host, port))
         self.server.listen(1)
@@ -50,48 +46,10 @@ class TCPServer:
         print(f"TCP Server listening on {host}:{port}")
 
     def calculate_checksum(self, data):
-        # Calculate checksum from all bytes except the last one (checksum byte)
         result = 0
-        for b in data[:-1]:
+        for b in data:
             result ^= b
         return result
-
-    def handle_client(self, client_socket):
-        try:
-            while self.running:
-                random_value = random.randint(0, 10)
-                
-                # Get current timestamp in milliseconds
-                timestamp_ms = int(time.time() * 1000)
-                
-                # Create packet format:
-                # [P(1)][N(1)][id(1)][type(1)][payload_len(2)][payload(9)][checksum(1)]
-                
-                # Convert timestamp to 8 bytes
-                timestamp_bytes = struct.pack('>Q', timestamp_ms)  # big-endian 8-byte unsigned long long
-                
-                # Create payload (1B value + 8B timestamp)
-                payload = bytes([random_value]) + timestamp_bytes
-                
-                # Create packet with fixed P=0x00, N=0xFF
-                packet = bytes([
-                    0x00,           # P (fixed value)
-                    0xFF,           # N (fixed value)
-                    0x01,           # ID (Data)
-                    0x00,           # Type (Response)
-                    0x00, 0x09      # Payload Length (2 bytes = 9)
-                ]) + payload + bytes([0])
-                
-                # Calculate and set checksum
-                packet = packet[:-1] + bytes([self.calculate_checksum(packet)])
-                
-                client_socket.send(packet)
-                
-                time.sleep(1 / 24)  # Send 24 packets/s
-        except (socket.error, ConnectionResetError):
-            print("Client disconnected.")
-        finally:
-            client_socket.close()
 
     def run(self):
         while self.running:
@@ -102,18 +60,136 @@ class TCPServer:
                 client_thread.start()
             except:
                 break
-
         self.server.close()
 
     def cleanup(self):
         self.running = False
+
+class DataServer(TCPServerBase):
+    """Handles numeric data streaming"""
+    def __init__(self, host='0.0.0.0', port=5000):
+        super().__init__(host, port)
+        # Start RTSP
+        self.libcamera_proc = subprocess.Popen(libcamera_cmd, stdout=subprocess.PIPE)
+        self.ffmpeg_proc = subprocess.Popen(ffmpeg_cmd, stdin=self.libcamera_proc.stdout)
+        print("Streaming to rtsp://<IP_RPI>:8554/ES_MTX")
+
+    def handle_client(self, client_socket):
+        try:
+            while self.running:
+                # Send data packet
+                random_value = random.randint(0, 10)
+                timestamp_ms = int(time.time() * 1000)
+                
+                # Create data packet
+                timestamp_bytes = struct.pack('>Q', timestamp_ms)
+                payload = bytes([random_value]) + timestamp_bytes
+                
+                packet = bytes([
+                    0x00,           # P
+                    0xFF,           # N
+                    0x01,           # ID (Data)
+                    0x00,           # Type (Response)
+                    0x00, 0x09      # Payload Length (9 bytes)
+                ]) + payload + bytes([0])
+                
+                # Calculate and append checksum
+                packet = packet[:-1] + bytes([self.calculate_checksum(packet[:-1])])
+                client_socket.send(packet)
+                time.sleep(1 / 24)  # 24 Hz
+
+        except (socket.error, ConnectionResetError) as e:
+            print(f"Data client disconnected: {e}")
+        finally:
+            client_socket.close()
+
+    def cleanup(self):
+        super().cleanup()
         self.libcamera_proc.terminate()
         self.ffmpeg_proc.terminate()
 
+class SettingsServer(TCPServerBase):
+    """Handles settings requests"""
+    def __init__(self, host='0.0.0.0', port=5001):
+        super().__init__(host, port)
+        self.settings_file = 'config/camera_settings.json'
+
+    def handle_client(self, client_socket):
+        client_socket.settimeout(1.0)
+        print("Settings client connected")
+
+        try:
+            while self.running:
+                try:
+                    # Read request header
+                    header = client_socket.recv(6)
+                    if not header or len(header) != 6:
+                        continue
+
+                    if header[0] != 0x00 or header[1] != 0xFF:
+                        continue
+
+                    id_ = header[2]
+                    typ = header[3]
+
+                    # Handle settings request
+                    if id_ == 0x02 and typ == 0x01:
+                        try:
+                            # Read settings directly from json
+                            with open(self.settings_file, 'r') as f:
+                                settings = json.load(f)
+                            print("Loaded settings:", settings)
+
+                            # Pack settings as-is into payload
+                            settings_data = bytes([
+                                int(settings.get('gain', 1)),  # gain as-is
+                                int(settings.get('exposure', 1) * 10),  # exposure * 10 to preserve 1 decimal
+                                int(settings.get('awb_red', 1) * 10),  # awb * 10 to preserve 1 decimal
+                                int(settings.get('awb_green', 1) * 10),
+                                int(settings.get('awb_blue', 1) * 10),
+                                0, 0, 0, 0  # padding
+                            ])
+
+                            # Create response packet
+                            packet = bytes([
+                                0x00,           # P
+                                0xFF,           # N
+                                0x02,           # ID (Settings)
+                                0x00,           # Type (Response)
+                                0x00, 0x09      # Payload Length
+                            ]) + settings_data + bytes([0])
+
+                            packet = packet[:-1] + bytes([self.calculate_checksum(packet[:-1])])
+                            client_socket.send(packet)
+                            print("Sent settings")
+
+                        except Exception as e:
+                            print(f"Error reading settings: {e}")
+
+                except socket.timeout:
+                    pass  # Normal timeout
+                except Exception as e:
+                    print(f"Error handling client: {e}")
+                    break
+
+        except (socket.error, ConnectionResetError) as e:
+            print(f"Settings client disconnected: {e}")
+        finally:
+            client_socket.close()
+
 if __name__ == "__main__":
-    server = TCPServer()
+    data_server = DataServer(port=5000)
+    settings_server = SettingsServer(port=5001)
+
+    data_thread = threading.Thread(target=data_server.run, daemon=True)
+    settings_thread = threading.Thread(target=settings_server.run, daemon=True)
+
     try:
-        server.run()
+        data_thread.start()
+        settings_thread.start()
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
-        print("Stopping server...")
-        server.cleanup()
+        print("Stopping servers...")
+        data_server.cleanup()
+        settings_server.cleanup()
