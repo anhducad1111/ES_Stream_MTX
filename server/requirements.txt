@@ -1,0 +1,14 @@
+# Server TCP Application Dependencies
+# No external Python packages required - uses only standard library
+
+# Development and Quality Tools (optional)
+# black==23.7.0
+# flake8==6.0.0
+# mypy==1.5.1
+# pytest==7.4.0
+# coverage==7.3.0
+
+# Note: System dependencies required:
+# - libcamera-apps (Raspberry Pi camera support)
+# - ffmpeg (video processing)
+# - MediaMTX or similar RTSP server
