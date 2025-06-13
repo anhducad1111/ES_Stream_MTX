@@ -50,22 +50,6 @@ class App(ctk.CTk):
         # Set ourselves as parent for settings callbacks
         self.settings_view.set_parent(self)
 
-        # Status bar setup
-        self.status_frame = ctk.CTkFrame(self)
-        self.status_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
-        self.status_frame.grid_columnconfigure(0, weight=1)
-        self.status_frame.grid_columnconfigure(1, weight=1)
-        self.status_frame.grid_columnconfigure(2, weight=1)
-        
-        self.tcp_status = ctk.CTkLabel(self.status_frame, text="Data: Initializing...", fg_color="yellow")
-        self.tcp_status.grid(row=0, column=0, padx=5, pady=2, sticky="w")
-        
-        self.settings_status = ctk.CTkLabel(self.status_frame, text="Settings: Initializing...", fg_color="yellow")
-        self.settings_status.grid(row=0, column=1, padx=5, pady=2, sticky="w")
-        
-        self.video_status = ctk.CTkLabel(self.status_frame, text="Video: Initializing...", fg_color="yellow")
-        self.video_status.grid(row=0, column=2, padx=5, pady=2, sticky="w")
-        
         # Start components
         # Start TCP connections
         self.data_receiver = NumberDataReceiver(SERVER_IP, TCP_PORT)
@@ -86,16 +70,8 @@ class App(ctk.CTk):
         self.update_graph()
 
     def update_status(self):
-        # Update TCP Data status
-        if self.data_receiver.is_connected():
-            self.tcp_status.configure(text="Data: Connected", fg_color="green")
-        else:
-            self.tcp_status.configure(text="Data: Connecting...", fg_color="yellow")
-
-        # Update Settings status
         # Update status indicators
         if self.settings_receiver.is_connected():
-            self.settings_status.configure(text="Settings: Connected", fg_color="green")
             # Update settings UI if new data available
             settings = self.settings_receiver.get_settings()
             if settings:
@@ -122,20 +98,6 @@ class App(ctk.CTk):
                                 entries[slider_name].insert(0, f"{float(value):.1f}")
                 except Exception as e:
                     print(f"Error updating settings UI: {e}")
-        else:
-            self.settings_status.configure(text="Settings: Connecting...", fg_color="yellow")
-
-        if self.video_thread.is_connected():
-            self.video_status.configure(text="Video: Streaming", fg_color="green")
-        else:
-            self.video_status.configure(text="Video: Connecting...", fg_color="yellow")
-
-        # Update data connection status
-        if self.data_receiver.is_connected():
-            self.tcp_status.configure(text="Data: Connected", fg_color="green")
-        else:
-            self.tcp_status.configure(text="Data: Connecting...", fg_color="yellow")
-
         self.after(500, self.update_status)
         
     def update_video(self):

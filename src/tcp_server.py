@@ -3,6 +3,7 @@ import threading
 import struct
 import time
 from abc import ABC, abstractmethod
+from functools import reduce
 
 class TCPBase(ABC):
     """Base class with common TCP functionality"""
@@ -30,10 +31,45 @@ class TCPBase(ABC):
             return None
 
     def _calculate_checksum(self, data):
-        result = 0
-        for b in data:
-            result ^= b
-        return result
+        return reduce(lambda x, y: x ^ y, data)
+
+    def _create_packet(self, id_, typ, payload=b''):
+        """Create a packet with header and checksum"""
+        header = bytes([
+            0x00, 0xFF,  # P, N
+            id_,         # ID
+            typ,         # Type
+            len(payload) >> 8,  # Length MSB
+            len(payload) & 0xFF # Length LSB
+        ])
+        packet = header + payload
+        return packet + bytes([self._calculate_checksum(packet)])
+
+    def _read_packet(self, client):
+        """Read and validate a complete packet"""
+        # Read packet header
+        header = client.recv(6)
+        if not header or len(header) != 6:
+            raise ConnectionError("Invalid header")
+
+        if header[0] != 0x00 or header[1] != 0xFF:
+            return None, None, None
+
+        id_ = header[2]
+        typ = header[3]
+        payload_len = (header[4] << 8) | header[5]
+
+        # Read payload and checksum
+        data = client.recv(payload_len + 1)
+        if len(data) != payload_len + 1:
+            raise ConnectionError("Invalid payload")
+
+        # Verify checksum
+        packet = header + data[:-1]
+        if self._calculate_checksum(packet) != data[-1]:
+            return None, None, None
+
+        return id_, typ, data[:-1]
 
     def start(self):
         self.thread = threading.Thread(target=self._tcp_receiver, daemon=True)
@@ -49,6 +85,7 @@ class TCPBase(ABC):
 
     def _tcp_receiver(self):
         while self.run:
+            client = None
             try:
                 if self.connected and time.time() - self.last_data_time > self.data_timeout:
                     print(f"{self.__class__.__name__} connection stale, reconnecting...")
@@ -65,35 +102,14 @@ class TCPBase(ABC):
                             time.sleep(self.reconnect_delay)
                             continue
                         self.connected = True
+                        self._on_connect(client)
 
                 while self.run and self.connected:
                     try:
-                        # Read packet header
-                        header = client.recv(6)
-                        if not header or len(header) != 6:
-                            raise ConnectionError("Invalid header")
-
-                        if header[0] != 0x00 or header[1] != 0xFF:
-                            continue
-
-                        id_ = header[2]
-                        typ = header[3]
-                        payload_len = (header[4] << 8) | header[5]
-
-                        # Read payload and checksum
-                        data = client.recv(payload_len + 1)
-                        if len(data) != payload_len + 1:
-                            raise ConnectionError("Invalid payload")
-
-                        # Verify checksum
-                        packet = header + data[:-1]
-                        if self._calculate_checksum(packet) != data[-1]:
-                            continue
-
-                        # Handle packet
-                        self._handle_packet(id_, typ, data[:-1])
-                        self.last_data_time = time.time()
-
+                        id_, typ, payload = self._read_packet(client)
+                        if id_ is not None:
+                            self._handle_packet(id_, typ, payload)
+                            self.last_data_time = time.time()
                     except socket.timeout:
                         continue
                     except Exception as e:
@@ -105,9 +121,13 @@ class TCPBase(ABC):
                 print(f"{self.__class__.__name__} connection error: {e}")
                 self.connected = False
             finally:
-                if 'client' in locals():
+                if client:
                     client.close()
                 time.sleep(self.reconnect_delay)
+
+    def _on_connect(self, client):
+        """Called when connection is established"""
+        pass
 
     @abstractmethod
     def _handle_packet(self, id_, typ, payload):
@@ -151,23 +171,14 @@ class SettingsReceiver(TCPBase):
         try:
             # Pack settings into 5-byte payload
             payload = bytes([
-                int(settings['gain']),                # Direct value
+                int(settings['gain']),                  # Direct value
                 int(float(settings['exposure']) * 10),  # *10 for decimal
                 int(float(settings['awb_red']) * 10),
                 int(float(settings['awb_green']) * 10),
                 int(float(settings['awb_blue']) * 10)
             ])
 
-            # Create command packet
-            packet = bytes([
-                0x00, 0xFF,  # P, N
-                0x02,        # ID (Settings)
-                0x01,        # Type (Command)
-                0x00, 0x05   # Payload Length (5 bytes)
-            ]) + payload + bytes([0])
-
-            # Add checksum
-            packet = packet[:-1] + bytes([self._calculate_checksum(packet[:-1])])
+            packet = self._create_packet(0x02, 0x01, payload)
             self.client.send(packet)
             print("Sent settings command:", settings)
             return True
@@ -176,85 +187,15 @@ class SettingsReceiver(TCPBase):
             print(f"Error sending settings command: {e}")
             return False
 
-    def _tcp_receiver(self):
-        while self.run:
-            try:
-                if self.connected and time.time() - self.last_data_time > self.data_timeout:
-                    print("Settings connection stale, reconnecting...")
-                    self.connected = False
-                    continue
-
-                if not self.connected:
-                    current_time = time.time()
-                    if current_time - self.last_reconnect >= self.reconnect_delay:
-                        print(f"Attempting to connect to Settings TCP {self.server_ip}:{self.port}")
-                        client = self._connect()
-                        if not client:
-                            self.last_reconnect = current_time
-                            time.sleep(self.reconnect_delay)
-                            continue
-                        self.connected = True
-                        self.client = client  # Store client socket
-                        self.next_request_time = current_time
-
-                while self.run and self.connected:
-                    try:
-                        # Send request if we haven't received settings yet
-                        if not self.settings_received:
-                            request = bytes([
-                                0x00, 0xFF,  # P, N
-                                0x02,        # ID (Settings)
-                                0x01,        # Type (Request)
-                                0x00, 0x00   # Payload Length
-                            ]) + bytes([0])  # Checksum placeholder
-                            request = request[:-1] + bytes([self._calculate_checksum(request[:-1])])
-                            self.client.send(request)
-                            print("Requesting settings...")
-
-                        # Handle incoming packets
-                        header = self.client.recv(6)
-                        if not header or len(header) != 6:
-                            raise ConnectionError("Invalid header")
-
-                        if header[0] != 0x00 or header[1] != 0xFF:
-                            continue
-
-                        id_ = header[2]
-                        typ = header[3]
-                        payload_len = (header[4] << 8) | header[5]
-
-                        data = self.client.recv(payload_len + 1)
-                        if len(data) != payload_len + 1:
-                            raise ConnectionError("Invalid payload")
-
-                        packet = header + data[:-1]
-                        if self._calculate_checksum(packet) != data[-1]:
-                            continue
-
-                        # Process the packet
-                        self._handle_packet(id_, typ, data[:-1])
-                        self.last_data_time = time.time()
-
-                    except socket.timeout:
-                        # Just continue on timeout
-                        continue
-                    except Exception as e:
-                        print(f"Settings read error: {e}")
-                        self.connected = False
-                        self.client = None
-                        break
-
-                # Keep connection alive even after settings received
-                # so we can send commands
-
-            except Exception as e:
-                print(f"Settings connection error: {e}")
-                self.connected = False
-            finally:
-                if self.client:
-                    self.client.close()
-                    self.client = None
-                time.sleep(self.reconnect_delay)
+    def _on_connect(self, client):
+        """Store client socket and send initial settings request"""
+        self.client = client
+        self.next_request_time = time.time()
+        
+        if not self.settings_received:
+            request = self._create_packet(0x02, 0x01)
+            self.client.send(request)
+            print("Requesting settings...")
 
     def _handle_packet(self, id_, typ, payload):
         """Handle settings packets"""

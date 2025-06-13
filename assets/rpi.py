@@ -52,7 +52,8 @@ class CameraManager:
             "--exposure", "normal",
             "--ev", str(self.settings['exposure']),
             "--gain", str(self.settings['gain']),
-            "--awbgains", f"{self.settings['awb_red']},{self.settings['awb_green']},{self.settings['awb_blue']}",
+            "--awb", "custom",
+            "--awbgains", f"{self.settings['awb_red']},{self.settings['awb_blue']}",
             "-o", "-"
         ]
 

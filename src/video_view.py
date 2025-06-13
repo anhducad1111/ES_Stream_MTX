@@ -12,7 +12,7 @@ class VideoThread(threading.Thread):
     def __init__(self, rtsp_url):
         super().__init__(daemon=True)
         self.rtsp_url = rtsp_url
-        self.frame_queue = queue.Queue(maxsize=2)
+        self.frame_queue = queue.Queue(maxsize=3)
         self.running = True
         self.process = None
         self.connected = False
@@ -70,9 +70,12 @@ class VideoThread(threading.Thread):
                 self.last_frame_time = time.time()
                 
                 try:
-                    # Keep only latest frame
-                    while not self.frame_queue.empty():
-                        self.frame_queue.get_nowait()
+                    # Only drop frames if queue is full
+                    if self.frame_queue.full():
+                        try:
+                            self.frame_queue.get_nowait()  # Remove oldest frame
+                        except queue.Empty:
+                            pass
                     self.frame_queue.put_nowait(frame)
                 except:
                     pass
