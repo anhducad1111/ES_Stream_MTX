@@ -308,3 +308,4 @@ class AuthReceiver(TCPBase):
         """Reset authentication state"""
         self.auth_status = False
         self.auth_completed = False
+        

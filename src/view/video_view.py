@@ -2,6 +2,7 @@ import customtkinter as ctk
 
 class VideoView:
     """Video View - Pure UI component for displaying video frames"""
+    
     def __init__(self, master):
         
         # Video display label with clean styling
@@ -46,3 +47,4 @@ class VideoView:
                 image=None,
                 fg_color=("gray90", "gray30")
             )
+            

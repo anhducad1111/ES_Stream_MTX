@@ -1,11 +1,10 @@
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.dates as mdates
-from matplotlib.patches import Rectangle
-import customtkinter as ctk
 
 class GraphView:
     """Graph View - Pure UI component for displaying matplotlib graph"""
+    
     def __init__(self, master):
         self.master = master
         # Setup matplotlib figure with modern styling
@@ -96,3 +95,4 @@ class GraphView:
     def cleanup(self):
         """Clean up matplotlib resources"""
         plt.close(self.fig)
+        

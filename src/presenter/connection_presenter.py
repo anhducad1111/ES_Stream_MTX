@@ -1,9 +1,9 @@
 import threading
 import socket
-import time
 
 class ConnectionPresenter:
     """Connection Presenter - Handles connection logic and authentication"""
+    
     def __init__(self, view, auth_model, on_connected_callback):
         self.view = view
         self.auth_model = auth_model
@@ -143,3 +143,4 @@ class ConnectionPresenter:
         """Clean up resources"""
         if self.auth_presenter:
             self.auth_presenter.cleanup()
+            

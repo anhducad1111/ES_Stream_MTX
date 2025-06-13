@@ -138,3 +138,4 @@ class VideoModel(threading.Thread):
         for observer in self._observers:
             if hasattr(observer, 'on_video_connection_changed'):
                 observer.on_video_connection_changed(self.connected)
+                

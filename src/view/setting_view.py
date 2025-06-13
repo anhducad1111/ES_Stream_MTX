@@ -2,6 +2,7 @@ import customtkinter as ctk
 
 class SettingView:
     """Setting View - Pure UI component for camera settings"""
+    
     def __init__(self, master):
         # Main container - non-scrollable, compact design
         self.frame = ctk.CTkFrame(
@@ -322,3 +323,4 @@ class SettingView:
                 formatted_value = f"{float(value):.1f}"
                 self.entries[slider_name].insert(0, formatted_value)
                 self.value_labels[slider_name].configure(text=f"{formatted_value}{config['unit']}")
+                

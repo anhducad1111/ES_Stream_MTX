@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 
 class GraphPresenter:
     """Graph Presenter - Controls graph updates and interactions"""
+    
     def __init__(self, view, graph_model):
         self.view = view
         self.graph_model = graph_model
@@ -29,3 +30,4 @@ class GraphPresenter:
         """Clean up resources"""
         if hasattr(self.graph_model, 'remove_observer'):
             self.graph_model.remove_observer(self)
+            

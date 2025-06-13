@@ -1,10 +1,11 @@
 import customtkinter as ctk
-from .video_view import VideoView
 from .graph_view import GraphView
 from .setting_view import SettingView
+from .video_view import VideoView
 
 class App(ctk.CTk):
     """Main Application View - Pure UI layout and components"""
+    
     def __init__(self):
         super().__init__()
         
@@ -142,3 +143,4 @@ class App(ctk.CTk):
         self.destroy()
         import os
         os._exit(0)
+        

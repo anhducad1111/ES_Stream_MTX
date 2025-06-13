@@ -1,5 +1,6 @@
 class SettingsPresenter:
     """Settings Presenter - Controls settings interactions and communication"""
+    
     def __init__(self, view, settings_model, main_presenter):
         self.view = view
         self.settings_model = settings_model
@@ -63,3 +64,4 @@ class SettingsPresenter:
         """Clean up resources"""
         if hasattr(self.settings_model, 'remove_observer'):
             self.settings_model.remove_observer(self)
+            

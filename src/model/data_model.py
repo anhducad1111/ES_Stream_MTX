@@ -32,3 +32,4 @@ class DataModel:
         for observer in self._observers:
             if hasattr(observer, 'on_data_updated'):
                 observer.on_data_updated(self.finger_count, self.timestamp_ms)
+                

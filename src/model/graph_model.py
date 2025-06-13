@@ -103,3 +103,4 @@ class GraphModel:
         for observer in self._observers:
             if hasattr(observer, 'on_graph_data_updated'):
                 observer.on_graph_data_updated()
+                

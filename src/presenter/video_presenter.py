@@ -3,6 +3,7 @@ import customtkinter as ctk
 
 class VideoPresenter:
     """Video Presenter - Controls video display and stream management"""
+    
     def __init__(self, view, video_model):
         self.view = view
         self.video_model = video_model
@@ -50,3 +51,4 @@ class VideoPresenter:
         """Clean up resources"""
         if hasattr(self.video_model, 'remove_observer'):
             self.video_model.remove_observer(self)
+            

@@ -1,9 +1,12 @@
-import time
-from src.model.tcp_model import NumberDataReceiver, SettingsReceiver
-from src.model.data_model import DataModel
-from src.model.settings_model import SettingsModel
-from src.model.video_model import VideoModel
-from src.model.graph_model import GraphModel
+from src.model import (
+    NumberDataReceiver, 
+    SettingsReceiver,
+    DataModel,
+    SettingsModel,
+    GraphModel,
+    VideoModel
+)
+
 
 class MainPresenter:
     """Main Presenter - Controls main application logic and coordinates components"""
@@ -20,7 +23,7 @@ class MainPresenter:
         # Initialize TCP connections
         self.data_receiver = NumberDataReceiver(server_ip, tcp_port)
         self.settings_receiver = SettingsReceiver(server_ip, tcp_port + 1)
-        
+
         # Initialize video model
         rtsp_url = f"rtsp://{server_ip}:8554/ES_MTX"
         self.video_model = VideoModel(rtsp_url)
@@ -153,3 +156,4 @@ class MainPresenter:
         if hasattr(self, 'video_model'):
             self.video_model.stop()
         self.view.on_closing()
+        

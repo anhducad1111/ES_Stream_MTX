@@ -1,4 +1,4 @@
-from src.model.tcp_model import AuthReceiver
+from src.model import AuthReceiver
 import time
 
 class AuthPresenter:
@@ -97,3 +97,4 @@ class AuthPresenter:
             self.auth_model.remove_observer(self)
         if self.auth_receiver:
             self.auth_receiver.stop()
+            

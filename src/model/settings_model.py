@@ -1,5 +1,6 @@
 class SettingsModel:
     """Model for managing camera settings data"""
+
     def __init__(self):
         # Default settings
         self.settings = {
@@ -74,3 +75,4 @@ class SettingsModel:
         for observer in self._observers:
             if hasattr(observer, 'on_settings_updated'):
                 observer.on_settings_updated(self.settings.copy())
+                

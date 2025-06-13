@@ -1,6 +1,4 @@
 import customtkinter as ctk
-import threading
-import time
 
 class ConnectionModal:
     """Connection Modal - Handles server connection setup"""
@@ -305,3 +303,4 @@ class ConnectionModal:
         """Show the modal"""
         self.modal.deiconify()
         self.modal.focus()
+        
