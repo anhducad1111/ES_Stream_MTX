@@ -33,38 +33,43 @@ class CameraControl:
                 return json.load(f)
         except:
             return {
-                'exposure': 1,
+                'shutter': 10000,  # microseconds
                 'gain': 1,
                 'awb_red': 1.0,
-                'awb_green': 1.0,
-                'awb_blue': 1.0
+                'awb_blue': 1.0,
+                'contrast': 1.0,
+                'brightness': 0.0
             }
     
     def save_settings(self):
         settings = {
-            'exposure': float(self.exposure_slider.get()),
+            'shutter': int(self.shutter_slider.get()),
             'gain': int(self.gain_slider.get()),
             'awb_red': float(self.awb_r_slider.get()),
-            'awb_green': float(self.awb_g_slider.get()),
-            'awb_blue': float(self.awb_b_slider.get())
+            'awb_blue': float(self.awb_b_slider.get()),
+            'contrast': float(self.contrast_slider.get()),
+            'brightness': float(self.brightness_slider.get())
         }
-        with open('config/camera_settings.json', 'w') as f:
+        with open('/home/ad/Desktop/WS/stream_rtsp/config/camera_settings.json', 'w') as f:
             json.dump(settings, f)
 
-    def update_exposure_label(self, value):
-        self.exposure_label.configure(text=f"{float(value):.1f}")
+    def update_shutter_label(self, value):
+        self.shutter_label.configure(text=f"{int(float(value))}")
         
     def update_gain_label(self, value):
         self.gain_label.configure(text=f"{int(float(value))}")
         
     def update_awb_r_label(self, value):
-        self.awb_r_label.configure(text=f"{float(value):.1f}")
-        
-    def update_awb_g_label(self, value):
-        self.awb_g_label.configure(text=f"{float(value):.1f}")
+        self.awb_r_label.configure(text=f"{float(value):.2f}")
         
     def update_awb_b_label(self, value):
-        self.awb_b_label.configure(text=f"{float(value):.1f}")
+        self.awb_b_label.configure(text=f"{float(value):.2f}")
+        
+    def update_contrast_label(self, value):
+        self.contrast_label.configure(text=f"{float(value):.2f}")
+        
+    def update_brightness_label(self, value):
+        self.brightness_label.configure(text=f"{float(value):.2f}")
     
     def setup_gui(self):
         # Control frame
@@ -72,63 +77,74 @@ class CameraControl:
         self.control_frame.pack(padx=10, pady=10)
         
         # Control sliders with value labels
-        # Exposure
-        exposure_frame = ctk.CTkFrame(self.control_frame)
-        exposure_frame.pack(fill='x', padx=5, pady=5)
-        ctk.CTkLabel(exposure_frame, text="Exposure").pack(side='left', padx=5)
-        self.exposure_label = ctk.CTkLabel(exposure_frame, text=f"{self.settings['exposure']:.1f}")
-        self.exposure_label.pack(side='right', padx=5)
-        self.exposure_slider = ctk.CTkSlider(self.control_frame, from_=0.1, to=1.0, 
-                                           number_of_steps=99, command=self.update_exposure_label)
-        self.exposure_slider.set(self.settings['exposure'])
-        self.exposure_slider.pack(padx=5, pady=(0,10))
+        # Shutter Speed (microseconds)
+        shutter_frame = ctk.CTkFrame(self.control_frame)
+        shutter_frame.pack(fill='x', padx=5, pady=5)
+        ctk.CTkLabel(shutter_frame, text="Shutter (μs)").pack(side='left', padx=5)
+        self.shutter_label = ctk.CTkLabel(shutter_frame, text=f"{self.settings.get('shutter', 100)}")
+        self.shutter_label.pack(side='right', padx=5)
+        self.shutter_slider = ctk.CTkSlider(self.control_frame, from_=100, to=10000,
+                                           number_of_steps=100, command=self.update_shutter_label)
+        self.shutter_slider.set(self.settings.get('shutter', 100))
+        self.shutter_slider.pack(padx=5, pady=(0,10))
         
-        # Gain
+        # ISO Gain
         gain_frame = ctk.CTkFrame(self.control_frame)
         gain_frame.pack(fill='x', padx=5, pady=5)
-        ctk.CTkLabel(gain_frame, text="Gain").pack(side='left', padx=5)
+        ctk.CTkLabel(gain_frame, text="ISO Gain").pack(side='left', padx=5)
         self.gain_label = ctk.CTkLabel(gain_frame, text=str(self.settings['gain']))
         self.gain_label.pack(side='right', padx=5)
-        self.gain_slider = ctk.CTkSlider(self.control_frame, from_=1, to=10, 
-                                        number_of_steps=20, command=self.update_gain_label)
+        self.gain_slider = ctk.CTkSlider(self.control_frame, from_=1, to=16,
+                                        number_of_steps=15, command=self.update_gain_label)
         self.gain_slider.set(self.settings['gain'])
         self.gain_slider.pack(padx=5, pady=(0,10))
         
-        # AWB Red
+        # AWB Red Gain
         awb_r_frame = ctk.CTkFrame(self.control_frame)
         awb_r_frame.pack(fill='x', padx=5, pady=5)
         ctk.CTkLabel(awb_r_frame, text="AWB Red").pack(side='left', padx=5)
-        self.awb_r_label = ctk.CTkLabel(awb_r_frame, text=f"{self.settings['awb_red']:.1f}")
+        self.awb_r_label = ctk.CTkLabel(awb_r_frame, text=f"{self.settings['awb_red']:.2f}")
         self.awb_r_label.pack(side='right', padx=5)
-        self.awb_r_slider = ctk.CTkSlider(self.control_frame, from_=0.0, to=5.0, 
-                                         number_of_steps=50, command=self.update_awb_r_label)
+        self.awb_r_slider = ctk.CTkSlider(self.control_frame, from_=0.1, to=5.0,
+                                         number_of_steps=40, command=self.update_awb_r_label)
         self.awb_r_slider.set(self.settings['awb_red'])
         self.awb_r_slider.pack(padx=5, pady=(0,10))
         
-        # AWB Green
-        awb_g_frame = ctk.CTkFrame(self.control_frame)
-        awb_g_frame.pack(fill='x', padx=5, pady=5)
-        ctk.CTkLabel(awb_g_frame, text="AWB Green").pack(side='left', padx=5)
-        self.awb_g_label = ctk.CTkLabel(awb_g_frame, text=f"{self.settings['awb_green']:.1f}")
-        self.awb_g_label.pack(side='right', padx=5)
-        self.awb_g_slider = ctk.CTkSlider(self.control_frame, from_=0.0, to=5.0, 
-                                         number_of_steps=50, command=self.update_awb_g_label)
-        self.awb_g_slider.set(self.settings['awb_green'])
-        self.awb_g_slider.pack(padx=5, pady=(0,10))
-        
-        # AWB Blue
+        # AWB Blue Gain
         awb_b_frame = ctk.CTkFrame(self.control_frame)
         awb_b_frame.pack(fill='x', padx=5, pady=5)
         ctk.CTkLabel(awb_b_frame, text="AWB Blue").pack(side='left', padx=5)
-        self.awb_b_label = ctk.CTkLabel(awb_b_frame, text=f"{self.settings['awb_blue']:.1f}")
+        self.awb_b_label = ctk.CTkLabel(awb_b_frame, text=f"{self.settings['awb_blue']:.2f}")
         self.awb_b_label.pack(side='right', padx=5)
-        self.awb_b_slider = ctk.CTkSlider(self.control_frame, from_=0.0, to=5.0, 
-                                         number_of_steps=50, command=self.update_awb_b_label)
+        self.awb_b_slider = ctk.CTkSlider(self.control_frame, from_=0.1, to=5.0,
+                                         number_of_steps=40, command=self.update_awb_b_label)
         self.awb_b_slider.set(self.settings['awb_blue'])
         self.awb_b_slider.pack(padx=5, pady=(0,10))
         
+        # Contrast
+        contrast_frame = ctk.CTkFrame(self.control_frame)
+        contrast_frame.pack(fill='x', padx=5, pady=5)
+        ctk.CTkLabel(contrast_frame, text="Contrast").pack(side='left', padx=5)
+        self.contrast_label = ctk.CTkLabel(contrast_frame, text=f"{self.settings.get('contrast', 1.0):.2f}")
+        self.contrast_label.pack(side='right', padx=5)
+        self.contrast_slider = ctk.CTkSlider(self.control_frame, from_=0.0, to=2.0,
+                                           number_of_steps=200, command=self.update_contrast_label)
+        self.contrast_slider.set(self.settings.get('contrast', 1.0))
+        self.contrast_slider.pack(padx=5, pady=(0,10))
+        
+        # Brightness
+        brightness_frame = ctk.CTkFrame(self.control_frame)
+        brightness_frame.pack(fill='x', padx=5, pady=5)
+        ctk.CTkLabel(brightness_frame, text="Brightness").pack(side='left', padx=5)
+        self.brightness_label = ctk.CTkLabel(brightness_frame, text=f"{self.settings.get('brightness', 0.0):.2f}")
+        self.brightness_label.pack(side='right', padx=5)
+        self.brightness_slider = ctk.CTkSlider(self.control_frame, from_=-1.0, to=1.0,
+                                             number_of_steps=200, command=self.update_brightness_label)
+        self.brightness_slider.set(self.settings.get('brightness', 0.0))
+        self.brightness_slider.pack(padx=5, pady=(0,10))
+        
         # Apply button
-        self.apply_btn = ctk.CTkButton(self.control_frame, text="Apply", command=self.apply_settings)
+        self.apply_btn = ctk.CTkButton(self.control_frame, text="Apply Settings", command=self.apply_settings)
         self.apply_btn.pack(pady=15)
     
     def get_camera_cmd(self):
@@ -144,10 +160,11 @@ class CameraControl:
             "--level", "4.2",
             "--vflip",
             "--nopreview",
-            "--exposure", "normal",
-            "--ev", str(self.exposure_slider.get()),
-            "--gain", str(self.gain_slider.get()),
-            "--awbgains", f"{self.awb_r_slider.get()},{self.awb_g_slider.get()},{self.awb_b_slider.get()}",
+            "--shutter", str(int(self.shutter_slider.get())),
+            "--gain", str(int(self.gain_slider.get())),
+            "--awbgains", f"{self.awb_r_slider.get():.2f},{self.awb_b_slider.get():.2f}",
+            "--contrast", str(self.contrast_slider.get()),
+            "--brightness", str(self.brightness_slider.get()),
             "-o", "-"
         ]
     

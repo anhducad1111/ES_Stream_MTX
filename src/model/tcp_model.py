@@ -169,13 +169,14 @@ class SettingsReceiver(TCPBase):
             return False
 
         try:
-            # Pack settings into 5-byte payload
+            # Pack settings into 6-byte payload
             payload = bytes([
-                int(settings['gain']),                  # Direct value
-                int(float(settings['exposure']) * 10),  # *10 for decimal
-                int(float(settings['awb_red']) * 10),
-                int(float(settings['awb_green']) * 10),
-                int(float(settings['awb_blue']) * 10)
+                (settings['shutter'] // 100) & 0xFF,  # shutter / 100
+                int(settings['gain']),                # Direct value
+                int(float(settings['awb_red']) * 10), # *10 for decimal
+                int(float(settings['awb_blue']) * 10),
+                int(float(settings['contrast']) * 10),
+                int((settings['brightness'] + 1.0) * 127.5)  # map -1,1 to 0,255
             ])
 
             packet = self._create_packet(0x02, 0x01, payload)
@@ -204,19 +205,21 @@ class SettingsReceiver(TCPBase):
 
         if typ == 0x00 and len(payload) == 9:  # Settings response
             try:
-                # Get raw values from payload
-                gain = payload[0]  # Direct value
-                exposure = float(payload[1]) / 10.0  # Multiply by 10 on server
+                # Get raw values from payload (6 parameters)
+                shutter = payload[0] * 100  # multiply by 100 to get microseconds
+                gain = payload[1]  # Direct value
                 awb_red = float(payload[2]) / 10.0
-                awb_green = float(payload[3]) / 10.0
-                awb_blue = float(payload[4]) / 10.0
+                awb_blue = float(payload[3]) / 10.0
+                contrast = float(payload[4]) / 10.0
+                brightness = (payload[5] / 127.5) - 1.0  # map 0,255 to -1,1
                 
                 self.settings = {
+                    'shutter': shutter,
                     'gain': gain,
-                    'exposure': exposure,
                     'awb_red': awb_red,
-                    'awb_green': awb_green,
-                    'awb_blue': awb_blue
+                    'awb_blue': awb_blue,
+                    'contrast': contrast,
+                    'brightness': brightness
                 }
                 print("Settings received:", self.settings)
                 self.settings_received = True

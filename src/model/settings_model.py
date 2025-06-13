@@ -3,11 +3,12 @@ class SettingsModel:
     def __init__(self):
         # Default settings
         self.settings = {
+            'shutter': 10000,
             'gain': 1,
-            'exposure': 1.0,
             'awb_red': 1.0,
-            'awb_green': 1.0,
-            'awb_blue': 1.0
+            'awb_blue': 1.0,
+            'contrast': 1.0,
+            'brightness': 0.0
         }
         self._observers = []
 
@@ -36,11 +37,12 @@ class SettingsModel:
         
         # Validation rules
         validation_rules = {
-            'gain': {'min': 1, 'max': 10, 'type': int},
-            'exposure': {'min': 0.1, 'max': 1.0, 'type': float},
-            'awb_red': {'min': 0.0, 'max': 5.0, 'type': float},
-            'awb_green': {'min': 0.0, 'max': 5.0, 'type': float},
-            'awb_blue': {'min': 0.0, 'max': 5.0, 'type': float}
+            'shutter': {'min': 100, 'max': 10000, 'type': int},
+            'gain': {'min': 1, 'max': 16, 'type': int},
+            'awb_red': {'min': 0.1, 'max': 5.0, 'type': float},
+            'awb_blue': {'min': 0.1, 'max': 5.0, 'type': float},
+            'contrast': {'min': 0.0, 'max': 2.0, 'type': float},
+            'brightness': {'min': -1.0, 'max': 1.0, 'type': float}
         }
         
         for key, value in settings.items():

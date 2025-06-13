@@ -25,11 +25,12 @@ class CameraManager:
             except Exception as e:
                 print(f"Error loading settings: {e}, using defaults")
                 self.settings = {
-                    'exposure': 1.0,
+                    'shutter': 10000,
                     'gain': 1,
                     'awb_red': 1.0,
-                    'awb_green': 1.0,
-                    'awb_blue': 1.0
+                    'awb_blue': 1.0,
+                    'contrast': 1.0,
+                    'brightness': 0.0
                 }
             
             self.libcamera_proc = None
@@ -49,11 +50,11 @@ class CameraManager:
             "--level", "4.2",
             "--vflip",
             "--nopreview",
-            "--exposure", "normal",
-            "--ev", str(self.settings['exposure']),
+            "--shutter", str(self.settings['shutter']),
             "--gain", str(self.settings['gain']),
-            "--awb", "custom",
-            "--awbgains", f"{self.settings['awb_red']},{self.settings['awb_blue']}",
+            "--awbgains", f"{self.settings['awb_red']:.2f},{self.settings['awb_blue']:.2f}",
+            "--contrast", str(self.settings['contrast']),
+            "--brightness", str(self.settings['brightness']),
             "-o", "-"
         ]
 
@@ -199,14 +200,15 @@ class SettingsServer(TCPServerBase):
                         try:
                             print(f"Got settings packet: len={payload_len}")
                             if payload_len == 0:  # Request current settings
-                                # Send current settings
+                                # Send current settings (6 parameters)
                                 settings_data = bytes([
+                                    (self.camera_mgr.settings['shutter'] // 100) & 0xFF,  # shutter / 100
                                     int(self.camera_mgr.settings['gain']),
-                                    int(self.camera_mgr.settings['exposure'] * 10),
                                     int(self.camera_mgr.settings['awb_red'] * 10),
-                                    int(self.camera_mgr.settings['awb_green'] * 10),
                                     int(self.camera_mgr.settings['awb_blue'] * 10),
-                                    0, 0, 0, 0  # padding
+                                    int(self.camera_mgr.settings['contrast'] * 10),
+                                    int((self.camera_mgr.settings['brightness'] + 1.0) * 127.5),  # map -1,1 to 0,255
+                                    0, 0, 0  # padding
                                 ])
 
                                 packet = bytes([
@@ -221,15 +223,16 @@ class SettingsServer(TCPServerBase):
                                 client_socket.send(packet)
                                 print("Sent current settings")
 
-                            elif payload_len == 5:  # Update settings command
+                            elif payload_len == 6:  # Update settings command (6 parameters)
                                 print("Processing settings update command")
                                 # Update settings
                                 new_settings = {
-                                    'gain': payload[0],
-                                    'exposure': payload[1] / 10.0,
+                                    'shutter': payload[0] * 100,  # multiply by 100 to get microseconds
+                                    'gain': payload[1],
                                     'awb_red': payload[2] / 10.0,
-                                    'awb_green': payload[3] / 10.0,
-                                    'awb_blue': payload[4] / 10.0
+                                    'awb_blue': payload[3] / 10.0,
+                                    'contrast': payload[4] / 10.0,
+                                    'brightness': (payload[5] / 127.5) - 1.0  # map 0,255 to -1,1
                                 }
                                 self.camera_mgr.update_settings(new_settings)
 
