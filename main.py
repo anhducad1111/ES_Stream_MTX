@@ -1,5 +1,7 @@
 from src.view.main_view import App
 from src.view.connection_modal import ConnectionModal
+from src.model.auth_model import AuthModel
+from src.presenter.connection_presenter import ConnectionPresenter
 from src.presenter.main_presenter import MainPresenter
 from src.presenter.graph_presenter import GraphPresenter
 from src.presenter.settings_presenter import SettingsPresenter
@@ -12,6 +14,8 @@ class AppManager:
         self.app = None
         self.main_presenter = None
         self.connection_modal = None
+        self.connection_presenter = None
+        self.auth_model = None
         
     def start_application(self):
         """Start the application with connection modal"""
@@ -19,8 +23,20 @@ class AppManager:
         temp_root = ctk.CTk()
         temp_root.withdraw()  # Hide the temporary window
         
-        # Show connection modal
+        # Create auth model
+        self.auth_model = AuthModel()
+        
+        # Create connection modal
         self.connection_modal = ConnectionModal(temp_root, self._on_connected)
+        
+        # Create connection presenter
+        self.connection_presenter = ConnectionPresenter(
+            self.connection_modal,
+            self.auth_model,
+            self._on_connected
+        )
+        
+        # Show connection modal
         self.connection_modal.show()
         
         # Start the event loop
@@ -28,6 +44,10 @@ class AppManager:
         
     def _on_connected(self, server_ip):
         """Called when connection is successful"""
+        # Clean up connection components
+        if self.connection_presenter:
+            self.connection_presenter.cleanup()
+        
         # Destroy the temporary root
         if self.connection_modal:
             self.connection_modal.modal.master.quit()

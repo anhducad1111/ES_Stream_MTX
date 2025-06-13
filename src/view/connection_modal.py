@@ -12,7 +12,7 @@ class ConnectionModal:
         # Create modal window
         self.modal = ctk.CTkToplevel(master)
         self.modal.title("Server Connection")
-        self.modal.geometry("400x300")
+        self.modal.geometry("400x380")
         self.modal.resizable(False, False)
         
         # Make modal always on top and block main window
@@ -40,7 +40,7 @@ class ConnectionModal:
         
         # Modal dimensions
         modal_width = 400
-        modal_height = 300
+        modal_height = 380
         
         # Calculate center position on screen
         x = (screen_width // 2) - (modal_width // 2)
@@ -86,8 +86,26 @@ class ConnectionModal:
             font=ctk.CTkFont(size=12),
             height=35
         )
-        self.ip_entry.pack(fill="x", pady=(0, 20))
+        self.ip_entry.pack(fill="x", pady=(0, 15))
         self.ip_entry.insert(0, "192.168.137.112")  # Default IP
+        
+        # Password input
+        password_label = ctk.CTkLabel(
+            form_frame,
+            text="Password:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        password_label.pack(anchor="w", pady=(0, 5))
+        
+        self.password_entry = ctk.CTkEntry(
+            form_frame,
+            placeholder_text="Enter password",
+            font=ctk.CTkFont(size=12),
+            height=35,
+            show="*"
+        )
+        self.password_entry.pack(fill="x", pady=(0, 20))
+        # No default password - user must enter manually
         
         # Connect button
         self.connect_button = ctk.CTkButton(
@@ -100,6 +118,9 @@ class ConnectionModal:
             hover_color=("darkblue", "blue")
         )
         self.connect_button.pack(fill="x", pady=(0, 15))
+        
+        # Store callback for connect action
+        self.connect_callback = None
         
         # Status frame
         self.status_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
@@ -129,21 +150,14 @@ class ConnectionModal:
         
         # Bind Enter key to connect
         self.ip_entry.bind('<Return>', lambda e: self._on_connect_clicked())
+        self.password_entry.bind('<Return>', lambda e: self._on_connect_clicked())
         
     def _on_connect_clicked(self):
-        """Handle connect button click"""
-        ip_address = self.ip_entry.get().strip()
-        
-        if not ip_address:
-            self._show_error("Please enter an IP address")
-            return
-            
-        if not self._validate_ip(ip_address):
-            self._show_error("Please enter a valid IP address")
-            return
-            
-        # Start connection process
-        self._start_connection(ip_address)
+        """Handle connect button click - delegate to presenter"""
+        if self.connect_callback:
+            ip_address = self.ip_entry.get().strip()
+            password = self.password_entry.get().strip()
+            self.connect_callback(ip_address, password)
         
     def _validate_ip(self, ip):
         """Validate IP address format"""
@@ -158,22 +172,25 @@ class ConnectionModal:
         except:
             return False
             
-    def _start_connection(self, ip_address):
-        """Start the connection process"""
-        # Disable UI elements
+    def set_connect_callback(self, callback):
+        """Set callback for connect button"""
+        self.connect_callback = callback
+    
+    def disable_inputs(self):
+        """Disable input fields during connection"""
         self.connect_button.configure(state="disabled")
         self.ip_entry.configure(state="disabled")
-        
-        # Show connecting status
-        self._show_connecting()
-        
-        # Start connection test in background thread
-        connection_thread = threading.Thread(
-            target=self._test_connection,
-            args=(ip_address,),
-            daemon=True
-        )
-        connection_thread.start()
+        self.password_entry.configure(state="disabled")
+    
+    def enable_inputs(self):
+        """Enable input fields"""
+        self.connect_button.configure(state="normal")
+        self.ip_entry.configure(state="normal")
+        self.password_entry.configure(state="normal")
+    
+    def get_credentials(self):
+        """Get current IP and password"""
+        return self.ip_entry.get().strip(), self.password_entry.get().strip()
         
     def _show_connecting(self):
         """Show connecting status"""
@@ -187,20 +204,7 @@ class ConnectionModal:
         self.progress_bar.configure(mode="indeterminate")
         self.progress_bar.start()
         
-    def _show_connected(self):
-        """Show connected status and start countdown"""
-        self.progress_bar.stop()
-        self.progress_bar.pack_forget()
-        
-        self.status_label.configure(
-            text="✅ Connected successfully!",
-            text_color=("green", "lightgreen")
-        )
-        
-        self.countdown_label.pack(pady=(5, 0))
-        
-        # Start countdown
-        self._start_countdown()
+    # Removed _show_connected() - now using show_auth_success() + start_countdown() from presenter
         
     def _show_error(self, message):
         """Show error message"""
@@ -215,9 +219,8 @@ class ConnectionModal:
         )
         self.status_label.pack(pady=(10, 0))
         
-        # Re-enable UI elements
-        self.connect_button.configure(state="normal")
-        self.ip_entry.configure(state="normal")
+        # Re-enable UI elements after error
+        self.enable_inputs()
         
         # Hide error after 3 seconds
         self.modal.after(3000, self._hide_status)
@@ -230,37 +233,35 @@ class ConnectionModal:
         if self.countdown_label.winfo_viewable():
             self.countdown_label.pack_forget()
             
-    def _test_connection(self, ip_address):
-        """Test connection to server (runs in background thread)"""
-        try:
-            import socket
+    def show_auth_success(self):
+        """Show authentication success (called by presenter)"""
+        # Just show success message, don't start countdown here
+        # Countdown will be started by presenter via start_countdown()
+        self.progress_bar.stop()
+        self.progress_bar.pack_forget()
+        
+        self.status_label.configure(
+            text="✅ Connected successfully!",
+            text_color=("green", "lightgreen")
+        )
+        self.status_label.pack(pady=(10, 5))
+    
+    def show_auth_error(self, message="Authentication failed"):
+        """Show authentication error (called by presenter)"""
+        self._show_error(message)
+    
+    def update_status(self, message):
+        """Update status message (called by presenter)"""
+        self.status_label.configure(
+            text=message,
+            text_color=("orange", "yellow")
+        )
+        if not self.status_label.winfo_viewable():
+            self.status_label.pack(pady=(10, 5))
             
-            # Test data port
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(5.0)
-            result = sock.connect_ex((ip_address, 5000))
-            sock.close()
-            
-            if result == 0:
-                # Test settings port
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(5.0)
-                result = sock.connect_ex((ip_address, 5001))
-                sock.close()
-                
-                if result == 0:
-                    # Connection successful
-                    self.modal.after(0, self._show_connected)
-                else:
-                    self.modal.after(0, lambda: self._show_error("Settings port (5001) not accessible"))
-            else:
-                self.modal.after(0, lambda: self._show_error("Data port (5000) not accessible"))
-                
-        except Exception as e:
-            self.modal.after(0, lambda: self._show_error(f"Connection failed: {str(e)}"))
-            
-    def _start_countdown(self):
-        """Start 3-second countdown before closing modal"""
+    def start_countdown(self, callback):
+        """Start 3-second countdown before calling callback"""
+        self.app_callback = callback
         self.countdown_time = 3
         self._update_countdown()
         
@@ -270,6 +271,7 @@ class ConnectionModal:
             self.countdown_label.configure(
                 text=f"Starting application in {self.countdown_time} seconds..."
             )
+            self.countdown_label.pack(pady=(5, 0))
             self.countdown_time -= 1
             self.modal.after(1000, self._update_countdown)
         else:
@@ -278,20 +280,22 @@ class ConnectionModal:
             
     def _close_modal_and_start_app(self):
         """Close modal and start the main application"""
-        ip_address = self.ip_entry.get().strip()
-        
-        # Call the callback with the IP address
-        if self.on_connected_callback:
-            self.on_connected_callback(ip_address)
+        # Call the callback to enter app
+        if hasattr(self, 'app_callback') and self.app_callback:
+            self.app_callback()
             
         # Close modal
         self.modal.grab_release()
         self.modal.destroy()
         
     def _on_close_attempt(self):
-        """Handle attempt to close modal (prevent closing)"""
-        # Show message that connection is required
-        self._show_error("Connection required to continue")
+        """Handle attempt to close modal - allow closing to exit app"""
+        # Allow user to close modal and exit application
+        self.modal.grab_release()
+        self.modal.destroy()
+        # Exit the entire application
+        import sys
+        sys.exit(0)
         
     def set_connection_test_callback(self, callback):
         """Set callback for connection testing"""

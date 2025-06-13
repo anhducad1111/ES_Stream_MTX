@@ -229,3 +229,82 @@ class SettingsReceiver(TCPBase):
 
     def get_settings(self):
         return self.settings
+
+class AuthReceiver(TCPBase):
+    """Handles authentication with server"""
+    def __init__(self, server_ip, port=5002):
+        super().__init__(server_ip, port)
+        self.auth_status = False
+        self.auth_completed = False
+        self.client = None
+    
+    def authenticate(self, password):
+        """Send authentication request"""
+        if not self.connected or not self.client:
+            print("Not connected - cannot authenticate")
+            return False
+        
+        try:
+            # Create auth payload (full password as ASCII)
+            password_bytes = password.encode('ascii')
+            payload = password_bytes
+            
+            packet = self._create_packet(0x00, 0x01, payload)  # ID=0x00 (Auth), Type=0x01 (Command)
+            self.client.send(packet)
+            print(f"Sent auth request with password: {password}")
+            return True
+            
+        except Exception as e:
+            print(f"Error sending auth request: {e}")
+            return False
+    
+    def _on_connect(self, client):
+        """Store client socket for authentication"""
+        self.client = client
+        print("Auth client connected, ready for authentication")
+    
+    def _handle_packet(self, id_, typ, payload):
+        """Handle authentication response packets"""
+        print(f"AUTH RECEIVER: Got packet - ID={id_:02x}, Type={typ:02x}, Payload={payload}")
+        
+        if id_ != 0x00:  # Not an auth packet
+            print(f"AUTH RECEIVER: Ignoring non-auth packet ID={id_:02x}")
+            return
+            
+        if typ == 0x00:  # Success response
+            try:
+                print(f"AUTH RECEIVER: Success response, payload='{payload}'")
+                if payload == b'ready':
+                    print("AUTH RECEIVER: Authentication successful!")
+                    self.auth_status = True
+                    self.auth_completed = True
+                else:
+                    print(f"AUTH RECEIVER: Unknown auth response: {payload}")
+                    self.auth_status = False
+                    self.auth_completed = True
+            except Exception as e:
+                print(f"AUTH RECEIVER: Error parsing auth success: {e}")
+                self.auth_status = False
+                self.auth_completed = True
+                
+        elif typ == 0x02:  # Error response
+            print("AUTH RECEIVER: Authentication failed - server rejected password!")
+            self.auth_status = False
+            self.auth_completed = True
+        else:
+            print(f"AUTH RECEIVER: Unknown response type: {typ:02x}")
+            self.auth_status = False
+            self.auth_completed = True
+    
+    def get_auth_status(self):
+        """Get authentication result"""
+        return self.auth_status
+    
+    def is_auth_completed(self):
+        """Check if authentication process completed"""
+        return self.auth_completed
+    
+    def reset_auth(self):
+        """Reset authentication state"""
+        self.auth_status = False
+        self.auth_completed = False

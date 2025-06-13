@@ -250,19 +250,125 @@ class SettingsServer(TCPServerBase):
         finally:
             client_socket.close()
 
+class AuthServer(TCPServerBase):
+    """Handles authentication requests"""
+    def __init__(self, host='0.0.0.0', port=5002):
+        super().__init__(host, port)
+        self.valid_password = "1111"  # Default password
+    
+    def handle_client(self, client_socket):
+        client_socket.settimeout(5.0)
+        print("Auth client connected")
+        
+        try:
+            # Read authentication request
+            header = client_socket.recv(6)
+            if not header or len(header) != 6:
+                print("Invalid auth header")
+                return
+            
+            if header[0] != 0x00 or header[1] != 0xFF:
+                print("Invalid auth packet format")
+                return
+            
+            id_ = header[2]
+            typ = header[3]
+            payload_len = (header[4] << 8) | header[5]
+            
+            # Check if it's auth request
+            if id_ == 0x00 and typ == 0x01:  # Auth ID, Command type
+                try:
+                    # Get password payload
+                    if payload_len > 0:
+                        password_payload = client_socket.recv(payload_len)
+                        if len(password_payload) != payload_len:
+                            print("Invalid password payload length")
+                            return
+                        
+                        # Get checksum
+                        checksum_byte = client_socket.recv(1)
+                        if len(checksum_byte) != 1:
+                            print("Missing checksum")
+                            return
+                        
+                        # Verify checksum
+                        packet = header + password_payload
+                        expected_checksum = self.calculate_checksum(packet)
+                        
+                        if checksum_byte[0] != expected_checksum:
+                            print("Invalid checksum")
+                            return
+                        
+                        # Check password (full password validation)
+                        received_password = password_payload.decode('ascii', errors='ignore')
+                        print(f"Received password: '{received_password}' (length: {len(received_password)})")
+                        print(f"Expected password: '{self.valid_password}' (length: {len(self.valid_password)})")
+                        
+                        if received_password == self.valid_password:
+                            # Send success response
+                            success_payload = b'ready'
+                            response_packet = bytes([
+                                0x00,           # P
+                                0xFF,           # N
+                                0x00,           # ID (Auth)
+                                0x00,           # Type (Response)
+                                0x00, len(success_payload)  # Payload Length
+                            ]) + success_payload
+                            
+                            # Add checksum
+                            response_packet += bytes([self.calculate_checksum(response_packet)])
+                            client_socket.send(response_packet)
+                            print("Authentication successful - sent 'ready'")
+                        else:
+                            # Send error response
+                            error_packet = bytes([
+                                0x00,           # P
+                                0xFF,           # N
+                                0x00,           # ID (Auth)
+                                0x02,           # Type (Error)
+                                0x00, 0x00      # No payload
+                            ])
+                            
+                            # Add checksum
+                            error_packet += bytes([self.calculate_checksum(error_packet)])
+                            client_socket.send(error_packet)
+                            print("Authentication failed - wrong password")
+                    else:
+                        print("No password provided")
+                        
+                except Exception as e:
+                    print(f"Error processing auth request: {e}")
+            else:
+                print(f"Not an auth request: ID={id_:02x}, Type={typ:02x}")
+                
+        except socket.timeout:
+            print("Auth client timeout")
+        except Exception as e:
+            print(f"Auth client error: {e}")
+        finally:
+            client_socket.close()
+
 if __name__ == "__main__":
     data_server = DataServer(port=5000)
     settings_server = SettingsServer(port=5001)
+    auth_server = AuthServer(port=5002)
 
     data_thread = threading.Thread(target=data_server.run, daemon=True)
     settings_thread = threading.Thread(target=settings_server.run, daemon=True)
+    auth_thread = threading.Thread(target=auth_server.run, daemon=True)
 
     try:
         data_thread.start()
         settings_thread.start()
+        auth_thread.start()
+        print("All servers started:")
+        print("- Data server: port 5000")
+        print("- Settings server: port 5001")
+        print("- Auth server: port 5002")
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         print("Stopping servers...")
         data_server.cleanup()
         settings_server.cleanup()
+        auth_server.cleanup()
