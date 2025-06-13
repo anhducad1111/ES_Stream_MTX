@@ -76,13 +76,13 @@ class SettingView:
         self.frame.grid_columnconfigure(1, weight=1)
         
         # Title
-        title_label = ctk.CTkLabel(
-            self.frame,
-            text="📷 Camera Settings",
-            font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=("gray10", "gray90")
-        )
-        title_label.grid(row=0, column=0, columnspan=2, pady=(15, 10), sticky="ew")
+        # title_label = ctk.CTkLabel(
+        #     self.frame,
+        #     text="📷 Camera Settings",
+        #     font=ctk.CTkFont(size=18, weight="bold"),
+        #     text_color=("gray10", "gray90")
+        # )
+        # title_label.grid(row=0, column=0, columnspan=2, pady=(15, 10), sticky="ew")
         
         # Create compact controls in a 2-column layout
         row = 1

@@ -19,7 +19,7 @@ class CameraManager:
         if not CameraManager._initialized:
             # Load settings
             try:
-                with open('config/camera_settings.json', 'r') as f:
+                with open('/home/ad/Desktop/WS/stream_rtsp/config/camera_settings.json', 'r') as f:
                     self.settings = json.load(f)
                     print("Loaded camera settings:", self.settings)
             except Exception as e:
@@ -87,7 +87,7 @@ class CameraManager:
     def update_settings(self, new_settings):
         print("Updating camera settings:", new_settings)
         self.settings.update(new_settings)
-        with open('config/camera_settings.json', 'w') as f:
+        with open('/home/ad/Desktop/WS/stream_rtsp/config/camera_settings.json', 'w') as f:
             json.dump(self.settings, f)
         self.stop_camera()
         time.sleep(0.5)  # Wait for processes to close

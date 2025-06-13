@@ -1,42 +1,73 @@
 from src.view.main_view import App
+from src.view.connection_modal import ConnectionModal
 from src.presenter.main_presenter import MainPresenter
 from src.presenter.graph_presenter import GraphPresenter
 from src.presenter.settings_presenter import SettingsPresenter
 # from src.presenter.video_presenter import VideoPresenter  # Tạm bỏ để tránh conflict
+import customtkinter as ctk
+
+class AppManager:
+    """Manages application startup with connection modal"""
+    def __init__(self):
+        self.app = None
+        self.main_presenter = None
+        self.connection_modal = None
+        
+    def start_application(self):
+        """Start the application with connection modal"""
+        # Create a temporary root window for the modal
+        temp_root = ctk.CTk()
+        temp_root.withdraw()  # Hide the temporary window
+        
+        # Show connection modal
+        self.connection_modal = ConnectionModal(temp_root, self._on_connected)
+        self.connection_modal.show()
+        
+        # Start the event loop
+        temp_root.mainloop()
+        
+    def _on_connected(self, server_ip):
+        """Called when connection is successful"""
+        # Destroy the temporary root
+        if self.connection_modal:
+            self.connection_modal.modal.master.quit()
+            self.connection_modal.modal.master.destroy()
+        
+        # Now create the actual app with the server IP
+        self._create_app(server_ip)
+        
+    def _create_app(self, server_ip):
+        """Create and initialize the main application"""
+        # Create main view
+        self.app = App()
+        
+        # Create main presenter with the connected server IP
+        self.main_presenter = MainPresenter(self.app, server_ip)
+        
+        # Create specialized presenters
+        graph_presenter = GraphPresenter(
+            self.app.get_graph_view(),
+            self.main_presenter.get_graph_model()
+        )
+        
+        settings_presenter = SettingsPresenter(
+            self.app.get_settings_view(),
+            self.main_presenter.get_settings_model(),
+            self.main_presenter
+        )
+        
+        # Store presenters in app for cleanup
+        self.app.main_presenter = self.main_presenter
+        self.app.graph_presenter = graph_presenter
+        self.app.settings_presenter = settings_presenter
+        
+        # Start the main application loop
+        self.app.mainloop()
 
 def main():
-    """Initialize MVP architecture and start application"""
-    # Create main view
-    app = App()
-    
-    # Create main presenter with models
-    main_presenter = MainPresenter(app)
-    
-    # Create specialized presenters
-    graph_presenter = GraphPresenter(
-        app.get_graph_view(), 
-        main_presenter.get_graph_model()
-    )
-    
-    settings_presenter = SettingsPresenter(
-        app.get_settings_view(),
-        main_presenter.get_settings_model(),
-        main_presenter
-    )
-    
-    # video_presenter = VideoPresenter(
-    #     app.get_video_view(),
-    #     main_presenter.get_video_model()
-    # )
-    
-    # Store presenters in app for cleanup
-    app.main_presenter = main_presenter
-    app.graph_presenter = graph_presenter
-    app.settings_presenter = settings_presenter
-    # app.video_presenter = video_presenter  # Tạm bỏ
-    
-    # Start the application
-    return app
+    """Initialize and start application with connection modal"""
+    app_manager = AppManager()
+    app_manager.start_application()
 
 if __name__ == "__main__":
     try:
