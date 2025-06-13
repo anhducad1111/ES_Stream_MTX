@@ -1,0 +1,30 @@
+{
+  "application": {
+    "name": "ES IoT Tutorial MTX",
+    "version": "1.0.0",
+    "theme": "dark"
+  },
+  "connection": {
+    "default_port": 8554,
+    "timeout": 30,
+    "retry_attempts": 3
+  },
+  "video": {
+    "resolution": {
+      "width": 640,
+      "height": 480
+    },
+    "framerate": 30,
+    "format": "h264"
+  },
+  "graph": {
+    "update_interval": 100,
+    "max_data_points": 1000,
+    "auto_scale": true
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "logs/app.log",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  }
+}
