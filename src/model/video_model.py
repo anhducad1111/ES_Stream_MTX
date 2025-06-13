@@ -8,7 +8,8 @@ import time
 # Constants
 width, height = 640, 480
 
-class VideoThread(threading.Thread):
+class VideoModel(threading.Thread):
+    """Model for handling video stream data and processing"""
     def __init__(self, rtsp_url):
         super().__init__(daemon=True)
         self.rtsp_url = rtsp_url
@@ -18,6 +19,7 @@ class VideoThread(threading.Thread):
         self.connected = False
         self.last_frame_time = 0
         self.reconnect_delay = 1.0
+        self._observers = []
         
     def _start_ffmpeg(self):
         if self.process:
@@ -42,6 +44,7 @@ class VideoThread(threading.Thread):
             print(f"[{time.strftime('%H:%M:%S')}] RTSP stream connected")
             self.connected = True
             self.last_frame_time = time.time()
+            self._notify_connection_status()
             return True
         except Exception as e:
             print(f"[{time.strftime('%H:%M:%S')}] Failed to connect to RTSP: {e}")
@@ -77,6 +80,7 @@ class VideoThread(threading.Thread):
                         except queue.Empty:
                             pass
                     self.frame_queue.put_nowait(frame)
+                    # self._notify_frame_available()  # Bỏ notification để tránh conflict
                 except:
                     pass
                         
@@ -94,8 +98,10 @@ class VideoThread(threading.Thread):
             finally:
                 self.process = None
                 self.connected = False
+                self._notify_connection_status()
         
     def get_frame(self):
+        """Get latest frame, converted to RGB"""
         try:
             frame = self.frame_queue.get_nowait()
             if frame is not None:
@@ -111,3 +117,24 @@ class VideoThread(threading.Thread):
         print(f"[{time.strftime('%H:%M:%S')}] Stopping video thread")
         self.running = False
         self.cleanup()
+
+    def add_observer(self, observer):
+        """Add observer for video events"""
+        self._observers.append(observer)
+
+    def remove_observer(self, observer):
+        """Remove observer"""
+        if observer in self._observers:
+            self._observers.remove(observer)
+
+    def _notify_frame_available(self):
+        """Notify observers that new frame is available"""
+        for observer in self._observers:
+            if hasattr(observer, 'on_frame_available'):
+                observer.on_frame_available()
+
+    def _notify_connection_status(self):
+        """Notify observers of connection status change"""
+        for observer in self._observers:
+            if hasattr(observer, 'on_video_connection_changed'):
+                observer.on_video_connection_changed(self.connected)
