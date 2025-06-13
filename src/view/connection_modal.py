@@ -10,8 +10,8 @@ class ConnectionModal:
         # Create modal window
         self.modal = ctk.CTkToplevel(master)
         self.modal.title("Server Connection")
-        self.modal.geometry("400x380")
-        self.modal.resizable(False, False)
+        self.modal.geometry("400x400")
+        # self.modal.resizable(False, False)
         
         # Make modal always on top and block main window
         self.modal.transient(master)
@@ -38,7 +38,7 @@ class ConnectionModal:
         
         # Modal dimensions
         modal_width = 400
-        modal_height = 380
+        modal_height = 400
         
         # Calculate center position on screen
         x = (screen_width // 2) - (modal_width // 2)
@@ -243,6 +243,10 @@ class ConnectionModal:
             text_color=("green", "lightgreen")
         )
         self.status_label.pack(pady=(10, 5))
+        
+        # Hide the countdown label initially to ensure clean display
+        if hasattr(self, 'countdown_label'):
+            self.countdown_label.pack_forget()
     
     def show_auth_error(self, message="Authentication failed"):
         """Show authentication error (called by presenter)"""
@@ -261,15 +265,25 @@ class ConnectionModal:
         """Start 3-second countdown before calling callback"""
         self.app_callback = callback
         self.countdown_time = 3
+        
+        # Hide the success status message to make room for countdown
+        if hasattr(self, 'status_label') and self.status_label.winfo_viewable():
+            self.status_label.pack_forget()
+            
         self._update_countdown()
         
     def _update_countdown(self):
         """Update countdown display"""
         if self.countdown_time > 0:
             self.countdown_label.configure(
-                text=f"Starting application in {self.countdown_time} seconds..."
+                text=f"Go to app after {self.countdown_time}",
+                font=ctk.CTkFont(size=20, weight="bold"),
+                text_color=("green", "lightgreen")
             )
-            self.countdown_label.pack(pady=(5, 0))
+            # Make sure countdown label is visible
+            if not self.countdown_label.winfo_viewable():
+                self.countdown_label.pack(pady=(20, 10))
+            
             self.countdown_time -= 1
             self.modal.after(1000, self._update_countdown)
         else:

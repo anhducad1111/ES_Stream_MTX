@@ -8,113 +8,86 @@
 project_root/
 ├── src/                    # Source code package
 │   ├── __init__.py        # Root package init
+│   ├── utils/utils.py           # Common utilities
 │   ├── model/             # Data models
-│   │   ├── __init__.py
-│   │   └── *.py
 │   ├── view/              # UI components
-│   │   ├── __init__.py
-│   │   └── *.py
 │   ├── presenter/         # Business logic
-│   │   ├── __init__.py
-│   │   └── *.py
 │   └── controller/        # Controllers (if needed)
-│       ├── __init__.py
-│       └── *.py
+├── scripts/               # Automation scripts
+│   ├── setup.sh          # Project setup
+│   ├── build.sh          # Build process
+│   ├── deploy.sh         # Deployment
+│   └── backup.sh         # Backup procedures
 ├── tests/                 # Test files
 ├── docs/                  # Documentation
-├── assets/                # Static assets
-├── config/                # Configuration files
-├── requirements.txt       # Dependencies
-├── README.md             # Project documentation
-├── .gitignore            # Git ignore rules
-└── main.py               # Entry point
+├── assets/               # Static assets
+├── config/              # Configuration files
+├── requirements.txt     # Dependencies
+├── requirements-dev.txt # Dev dependencies
+├── Makefile            # Build automation
+├── README.md           # Documentation
+├── .gitignore         # Git ignore rules
+└── main.py            # Entry point
 ```
 
-### 1.2 Package __init__.py Requirements
+### 1.2 Project Utils (utils.py)
 
-- __MUST__ have `__init__.py` in every package directory
-- __MUST__ export public classes/functions in `__all__`
-- __SHOULD__ include docstring describing package purpose
-- __MAY__ include version info for root package
+Must provide standard utility functions:
 
-Example:
+```python
+def read_file(filepath: Union[str, Path]) -> str:
+    """Read content from a text file."""
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return f.read()
+
+def save_json(filepath: Union[str, Path], data: Dict[str, Any]) -> None:
+    """Save data to a JSON file. Creates directories if needed."""
+    filepath = Path(filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4)
+```
+
+### 1.3 Package __init__.py Requirements
 
 ```python
 """
 Model Package
 Contains all data models for the application.
 """
-
 from .auth_model import AuthModel
 from .data_model import DataModel
 
-__all__ = [
-    'AuthModel',
-    'DataModel'
-]
+__all__ = ['AuthModel', 'DataModel']
 ```
 
 ## 2. Code Formatting Standards
 
 ### 2.1 Spacing Rules
 
-- __MUST__ have single blank line between methods within a class
-- __MUST__ have double blank line between classes
-- __MUST__ have exactly one blank line at the end of every file
-- __MUST__ use 4 spaces for indentation (no tabs)
-- __MUST__ limit line length to 88 characters (Black standard)
+- Single blank line between methods
+- Double blank line between classes
+- One blank line at file end
+- 4 spaces indentation (no tabs)
+- 88 character line limit (Black standard)
 
-### 2.2 Class Structure
-
-```python
-class ExampleClass:
-    """Class docstring explaining purpose."""
-
-    def __init__(self):
-        """Initialize instance."""
-        pass
-
-    def method_one(self):
-        """Method docstring."""
-        pass
-
-    def method_two(self):
-        """Another method docstring."""
-        pass
-
-
-class AnotherClass:
-    """Another class with double blank line separation."""
-    pass
-```
-
-### 2.3 Import Organization
+### 2.2 Import Organization
 
 ```python
-# Standard library imports
+# Standard library
 import os
-import sys
 from typing import Dict, List
 
-# Third-party imports
+# Third-party
 import requests
-import customtkinter as ctk
 
-# Local application imports
-from src.model.auth_model import AuthModel
-from src.view.main_view import MainView
+# Local
+from src.model import DataModel
 ```
 
 ## 3. Documentation Requirements
 
 ### 3.1 Docstrings
-
-- __MUST__ have docstrings for all classes
-- __MUST__ have docstrings for all public methods
-- __SHOULD__ use Google or NumPy docstring style
-- __SHOULD__ include parameter and return type information
-
-Example:
 
 ```python
 def authenticate(self, username: str, password: str) -> bool:
@@ -124,68 +97,48 @@ def authenticate(self, username: str, password: str) -> bool:
     Args:
         username: User's login name
         password: User's password
-        
     Returns:
-        True if authentication successful, False otherwise
-        
+        True if authentication successful
     Raises:
-        ConnectionError: If unable to connect to auth server
+        ConnectionError: If auth server unavailable
     """
     pass
 ```
 
-### 3.2 README.md Structure
+### 3.2 README Structure
 
-```markdown
-# Project Name
+Must include:
 
-## Description
-Brief project description
-
-## Installation
-Step-by-step installation guide
-
-## Usage
-How to run and use the application
-
-## Project Structure
-Directory structure explanation
-
-## Contributing
-Guidelines for contributors
-
-## License
-License information
-```
+- Project description
+- Installation guide
+- Usage instructions
+- Project structure
+- Contributing guidelines
+- License information
 
 ## 4. Architecture Patterns
 
-### 4.1 MVP (Model-View-Presenter) Requirements
+### 4.1 MVP Requirements
 
-- __Model__: Data and business logic only
-- __View__: UI components, no business logic
-- __Presenter__: Mediates between Model and View
+- Model: Data and business logic only
+- View: UI components, no business logic
+- Presenter: Mediates Model and View
 
 ### 4.2 Observer Pattern
 
-- Models SHOULD notify observers of state changes
-- Use observer pattern for loose coupling
-- Implement add_observer/remove_observer methods
+- Models notify observers of changes
+- Implement add/remove observer methods
+- Use loose coupling
 
 ### 4.3 Separation of Concerns
 
-- Views MUST NOT contain business logic
-- Models MUST NOT import UI frameworks
-- Presenters handle all interactions between Model and View
+- Views: No business logic
+- Models: No UI imports
+- Presenters: Handle Model-View interaction
 
 ## 5. Error Handling
 
 ### 5.1 Exception Handling
-
-- __MUST__ use specific exception types
-- __MUST__ handle exceptions gracefully
-- __SHOULD__ log errors appropriately
-- __MUST NOT__ use bare except clauses
 
 ```python
 try:
@@ -200,9 +153,10 @@ except Exception as e:
 
 ### 5.2 Input Validation
 
-- __MUST__ validate all user inputs
-- __MUST__ validate network data
-- __SHOULD__ use type hints for validation
+- Validate all user inputs
+- Validate network data
+- Use type hints
+- Sanitize external inputs
 
 ## 6. Testing Requirements
 
@@ -217,179 +171,124 @@ tests/
 └── conftest.py
 ```
 
-### 6.2 Test Coverage
+### 6.2 Coverage Standards
 
-- __SHOULD__ aim for >80% code coverage
-- __MUST__ test all public methods
-- __MUST__ test error conditions
+- 80% code coverage minimum
+- Test all public methods
+- Test error conditions
+- Test edge cases
 
 ## 7. Configuration Management
 
-### 7.1 Configuration Files
+### 7.1 Config Requirements
 
-- __MUST__ use configuration files for settings
-- __SHOULD__ use JSON or YAML for config
-- __MUST NOT__ hardcode sensitive data
-- __SHOULD__ support environment-specific configs
-
-### 7.2 Environment Variables
-
-- Use environment variables for sensitive data
-- Provide defaults for development
-- Document all required environment variables
+- Use JSON/YAML config files
+- No hardcoded sensitive data
+- Support multiple environments
+- Use environment variables for secrets
+- Document all config options
 
 ## 8. Version Control
 
 ### 8.1 Git Requirements
 
-- __MUST__ have .gitignore file
-- __MUST NOT__ commit sensitive data
-- __MUST NOT__ commit IDE-specific files
-- __SHOULD__ use meaningful commit messages
+- Maintain .gitignore
+- No sensitive/IDE files
+- Meaningful commits
+- Branch naming conventions
 
-### 8.2 .gitignore Template
+### 8.2 .gitignore Essentials
 
 ```
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
 env/
 venv/
-.venv/
 
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Project specific
+# Project
 config/secrets.json
 logs/
 ```
 
-## 9. Dependencies Management
+## 9. Project Setup
 
-### 9.1 Requirements Files
+### 9.1 Virtual Environment
 
-- __MUST__ have requirements.txt
-- __SHOULD__ pin specific versions
-- __MAY__ use requirements-dev.txt for development dependencies
+```bash
+python -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
+pip install -r requirements.txt
+```
 
-### 9.2 Virtual Environment
+### 9.2 Makefile Targets
 
-- __MUST__ use virtual environment
-- __SHOULD__ document Python version requirements
-- __MUST__ not commit virtual environment
+- setup: Create venv and install deps
+- clean: Remove build artifacts
+- build: Build project
+- test: Run tests with coverage
+- format: Run Black and isort
+- lint: Run flake8
 
-## 10. Security Requirements
+## 10. Code Quality
 
-### 10.1 Authentication
+### 10.1 Required Tools
 
-- __MUST__ validate all authentication attempts
-- __MUST__ use secure password handling
-- __SHOULD__ implement proper session management
-- __MUST NOT__ log sensitive information
+- Black for formatting
+- flake8 for linting
+- isort for imports
+- mypy for types
+- pytest for testing
+- coverage for test coverage
 
-### 10.2 Input Sanitization
+### 10.2 Configuration
 
-- __MUST__ sanitize all external inputs
-- __MUST__ validate network data
-- __SHOULD__ use parameterized queries for databases
+```toml
+# pyproject.toml
+[tool.black]
+line-length = 88
+target-version = ['py38']
 
-## 11. Performance Guidelines
+[tool.isort]
+profile = "black"
+```
 
-### 11.1 Code Optimization
+## 11. Security Standards
 
-- __SHOULD__ profile performance-critical code
-- __MUST__ handle large datasets efficiently
-- __SHOULD__ implement proper caching where needed
+### 11.1 Authentication
 
-### 11.2 Resource Management
+- Validate all auth attempts
+- Secure password handling
+- Proper session management
+- No sensitive logging
 
-- __MUST__ properly close file handles
-- __MUST__ clean up network connections
-- __SHOULD__ implement proper garbage collection
+### 11.2 Data Protection
 
-## 12. Logging Standards
+- Input sanitization
+- Parameterized queries
+- Secure communications
+- Data encryption
 
-### 12.1 Logging Levels
+## 12. Performance
 
-- DEBUG: Detailed diagnostic information
-- INFO: General operational messages
-- WARNING: Warning messages
-- ERROR: Error conditions
-- CRITICAL: Critical error conditions
+### 12.1 Optimization
 
-### 12.2 Log Format
+- Profile critical code
+- Handle large datasets
+- Implement caching
+- Resource cleanup
+
+### 12.2 Logging
 
 ```python
-import logging
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('app.log'),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.FileHandler('app.log'), logging.StreamHandler()]
 )
 ```
-
-## 13. Code Quality Tools
-
-### 13.1 Recommended Tools
-
-- __Black__: Code formatting
-- __flake8__: Linting
-- __mypy__: Type checking
-- __pytest__: Testing
-- __coverage__: Test coverage
-
-### 13.2 Pre-commit Hooks
-
-- Format code with Black
-- Run linting checks
-- Run type checking
-- Run tests
-
-## 14. Deployment Requirements
-
-### 14.1 Production Readiness
-
-- __MUST__ have proper error handling
-- __MUST__ have logging configured
-- __MUST__ have health checks
-- __SHOULD__ have monitoring
-
-### 14.2 Environment Configuration
-
-- Separate configs for dev/staging/prod
-- Use environment variables for secrets
-- Document deployment process
-
----
-
-## Compliance Checklist
-
-Before project delivery, ensure:
-
-- [ ] All directories have __init__.py files
-- [ ] All Python files follow formatting standards
-- [ ] All classes and public methods have docstrings
-- [ ] README.md is complete and accurate
-- [ ] .gitignore is properly configured
-- [ ] requirements.txt lists all dependencies
-- [ ] No hardcoded secrets or sensitive data
-- [ ] All imports are properly organized
-- [ ] Code follows MVP architecture principles
-- [ ] Error handling is implemented
-- [ ] Logging is configured
-- [ ] Tests are written for core functionality
